@@ -1,0 +1,22 @@
+{
+  "name": "heat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HEAT — map-first event discovery (monorepo)",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/api"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:up": "docker compose -f infra/docker-compose.yml up -d",
+    "db:migrate": "npm run migrate --workspace apps/api",
+    "db:seed": "npm run seed --workspace apps/api",
+    "dev:api": "npm run dev --workspace apps/api"
+  }
+}

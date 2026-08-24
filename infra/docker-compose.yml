@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: heat-db
+    environment:
+      POSTGRES_USER: heat
+      POSTGRES_PASSWORD: heat
+      POSTGRES_DB: heat
+    ports:
+      - "5433:5432"
+    volumes:
+      - heat_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U heat -d heat"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  heat_pgdata:

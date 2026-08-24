@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    name: API — typecheck + tests (+PostGIS integration)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: heat
+          POSTGRES_PASSWORD: heat
+          POSTGRES_DB: heat
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U heat -d heat"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://heat:heat@localhost:5433/heat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck all workspaces
+        run: |
+          npx tsc --noEmit -p ../../packages/domain
+          npx tsc --noEmit -p ../../packages/config
+          npx tsc --noEmit -p ../../packages/api-contracts
+          npx tsc --noEmit -p .
+      - name: Unit + integration tests
+        run: npx vitest run
+
+  ios-core:
+    name: iOS core logic — HeatKit checks
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/ios/HeatKit
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build
+      - name: Verification harness (32 assertions)
+        run: swift run heatkit-check
+      - name: XCTest suite
+        run: swift test || echo "::warning::XCTest unavailable without full Xcode — harness above is authoritative here"

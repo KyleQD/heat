@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "@heat/domain": ["../../packages/domain/src/index.ts"],
+      "@heat/api-contracts": ["../../packages/api-contracts/src/index.ts"],
+      "@heat/config": ["../../packages/config/src/index.ts"]
+    }
+  },
+  "include": ["src", "seeds", "test"]
+}

@@ -1,0 +1,8 @@
+node_modules/
+*.log
+.env
+.DS_Store
+apps/ios/Heat.xcodeproj
+apps/ios/HeatKit/.build
+apps/ios/xcuserdata
+derived/

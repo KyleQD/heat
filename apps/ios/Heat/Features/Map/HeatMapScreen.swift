@@ -1,0 +1,390 @@
+import SwiftUI
+import Network
+import HeatKit
+
+/// M1 — Explore. The map is the primary surface; every other state is an
+/// overlay on top of it (M2 selection, M4 route, M5-M6 create, M7 search,
+/// M9 empty, M10 location denied).
+struct HeatMapScreen: View {
+    @EnvironmentObject private var env: AppEnvironment
+    @EnvironmentObject private var discovery: DiscoveryStore
+    @EnvironmentObject private var selection: SelectionStore
+    @EnvironmentObject private var routes: RouteStore
+    @EnvironmentObject private var create: CreateStore
+    @EnvironmentObject private var stars: StarStore
+
+    enum OverlayMode: Equatable {
+        case explore
+        case routePreview
+        case createLocation
+        case search
+    }
+
+    @State private var overlayMode: OverlayMode = .explore
+    @State private var showOfflineBanner = false
+    @ObservedObject private var reachability = Reachability()
+
+    /// Shared camera commands (also driven by deep links).
+    private var camera: MapCameraCommand { env.camera }
+
+    var body: some View {
+        ZStack {
+            MapCanvas(
+                events: presentedEvents,
+                clusters: overlayMode == .explore ? discovery.clusters : [],
+                heatPoints: env.flags.map_heat_layer_enabled ? discovery.heatPoints : [],
+                routePolyline: routePolylineCoords,
+                destination: routeDestination,
+                isCreateMode: overlayMode == .createLocation,
+                pinCoordinate: create.pinCoordinate,
+                selectedEventId: selection.selectedEventId,
+                starredIds: stars.starredIds,
+                camera: camera,
+                onViewportChange: handleViewport,
+                onSelectEvent: handleSelectEvent,
+                onSelectCluster: handleSelectCluster
+            )
+            .ignoresSafeArea()
+
+            VStack {
+                topControls
+                if showOfflineBanner { OfflineBanner().padding(.horizontal, 14).padding(.top, 6) }
+                if env.locationService.phase == .denied || env.locationService.authorizationState == .denied {
+                    HStack {
+                        Spacer()
+                        LocationDeniedCard().padding(.trailing, 16)
+                    }
+                    .padding(.top, 6)
+                }
+                Spacer()
+                if case .failed = discovery.state { errorBanner }
+            }
+
+            bottomArea
+        }
+        .overlay(alternativeSheet)
+        .onAppear {
+            if discovery.events.isEmpty {
+                centerOnDefaultCity()
+            }
+            env.locationService.refreshLocation()
+        }
+        .onChange(of: reachability.isOnline) { online in
+            showOfflineBanner = !online
+            if online { Task { await discovery.refresh() } }
+        }
+        .sheet(isPresented: createDetailsBinding) {
+            CreateEventSheet(onClose: cancelCreate)
+        }
+        .onChange(of: env.pendingDeepLinkEventId) { pending in
+            guard let id = pending else { return }
+            withAnimation { overlayMode = .explore }
+            selection.select(eventId: id, source: .search)
+        }
+        .onChange(of: selection.detail?.id) { detailId in
+            // Deep-link fly-to once the target detail lands.
+            if let detailId, env.pendingDeepLinkEventId == detailId,
+               let d = selection.detail {
+                camera.flyTo(d.location)
+                env.pendingDeepLinkEventId = nil
+            }
+        }
+        // P4-010 selected active events refresh faster than background map.
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
+            guard overlayMode == .explore else { return }
+            selection.refreshIfStale()
+        }
+    }
+
+    /// Details sheet opens once a location mode is confirmed (M6 over map).
+    private var createDetailsBinding: Binding<Bool> {
+        Binding(get: {
+            switch create.step {
+            case .requiredDetails, .optionalDetails, .checkingDuplicates,
+                 .reviewDuplicates, .publishing, .published:
+                return true
+            default:
+                return false
+            }
+        }, set: { shown in
+            if !shown { cancelCreate() }
+        })
+    }
+
+    // MARK: Derived data -----------------------------------------------------
+
+    /// Starred mode (M8): de-emphasis server-side filter keeps geography.
+    private var presentedEvents: [MapEvent] {
+        if overlayMode == .createLocation { return [] }
+        return discovery.events
+    }
+
+    private var routePolylineCoords: [Coordinate] {
+        guard let polyline = routes.previewResponse?.routes.first(where: { $0.mode == routes.selectedMode })?.polyline else { return [] }
+        return PolylineDecoder.decode(polyline)
+    }
+
+    private var routeDestination: Coordinate? {
+        routes.previewResponse?.destination
+    }
+
+    // MARK: Top controls (brand + search) ------------------------------------
+
+    private var topControls: some View {
+        HStack(spacing: 12) {
+            BrandButton()
+            SearchBarButton {
+                withAnimation(.spring(response: 0.35)) { overlayMode = .search }
+            }
+            .accessibilityLabel("Search events and venues")
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
+    // MARK: Bottom area -------------------------------------------------------
+
+    @ViewBuilder
+    private var bottomArea: some View {
+        VStack(spacing: 12) {
+            switch overlayMode {
+            case .explore:
+                Spacer()
+                floatingButtons
+                if isEmptyAndLoaded {
+                    EmptyStateCard(
+                        onTonight: { discovery.setWindow(.tonight) },
+                        onExpand: expandSearchArea,
+                        onCreate: beginCreateFromEmptyState
+                    )
+                }
+                controlsBar
+            case .routePreview:
+                RoutePreviewPanel(onClose: closeRoute)
+            case .createLocation:
+                CreateLocationBar(
+                    onSelectVenue: { id, name, coordinate in
+                        create.selectVenue(id: id, name: name, coordinate: coordinate)
+                        withAnimation { overlayMode = .explore }
+                    },
+                    onNext: proceedWithPin,
+                    onCancel: cancelCreate)
+            case .search:
+                Spacer()
+            }
+        }
+        .padding(.bottom, 4)
+    }
+
+    private var isEmptyAndLoaded: Bool {
+        if case .loaded = discovery.state { return discovery.events.isEmpty }
+        return false
+    }
+
+    // MARK: Floating buttons --------------------------------------------------
+
+    private var floatingButtons: some View {
+        HStack {
+            Spacer()
+            VStack(spacing: 14) {
+                CircleIconButton(systemImage: "location.fill",
+                                 isActive: camera.followingUser) {
+                    recenter()
+                }
+                .accessibilityLabel("Recenter on my location")
+
+                if env.flags.native_event_creation_enabled {
+                    CircleIconButton(systemImage: "plus", isActive: false) {
+                        beginCreate()
+                    }
+                    .accessibilityLabel("Create event")
+                }
+            }
+            .padding(.trailing, 16)
+        }
+    }
+
+    private var controlsBar: some View {
+        HStack(spacing: 10) {
+            TimeWindowToggle(selection: Binding(
+                get: { discovery.window },
+                set: { discovery.setWindow($0) }))
+            StarredToggleButton(isOn: Binding(
+                get: { discovery.starredOnlyMode },
+                set: { discovery.starredOnlyMode = $0 }))
+            FilterButton(category: $discovery.categoryFilter)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 6)
+    }
+
+    private var errorBanner: some View {
+        InlineError(message: "Couldn't load HEAT right now.") {
+            Task { await discovery.refresh() }
+        }
+        .padding(.horizontal, 24)
+    }
+
+    // MARK: Sheets ------------------------------------------------------------
+
+    /// One managed sheet host — never two competing sheets (doc 25 §5).
+    @ViewBuilder
+    private func alternativeSheet() -> some View {
+        if overlayMode == .search {
+            SearchOverlayView(onClose: { overlayMode = .explore }) { item in
+                handleSearchSelection(item)
+            }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if selection.selectedEventId != nil && overlayMode != .createLocation {
+            EventBottomSheet(
+                isExpanded: isSheetExpandedBinding,
+                onClose: closeSelection,
+                onStar: { toggleStarForSelected() },
+                onGo: { beginRouteForSelected() },
+                onTicket: recordTicketClick,
+                onReportRequested: {}
+            )
+        }
+    }
+
+    private var isSheetExpandedBinding: Binding<Bool> {
+        Binding(get: { selection.detail != nil && sheetExpanded }, set: { sheetExpanded = $0 })
+    }
+
+    @State private var sheetExpanded = false
+
+    // MARK: Interactions ------------------------------------------------------
+
+    private func handleViewport(_ region: ViewportRegion) {
+        guard overlayMode != .search else { return }
+        let query = APIClient.MapQuery(
+            north: region.north, south: region.south, east: region.east, west: region.west,
+            zoom: Int(region.zoom),
+            window: discovery.window,
+            category: discovery.categoryFilter,
+            starredOnly: discovery.starredOnlyMode,
+            includeStarredState: true)
+        discovery.viewportChanged(query)
+    }
+
+    private func handleSelectEvent(id: UUID) {
+        guard overlayMode != .createLocation else { return }         // conflict rule §7
+        guard overlayMode != .routePreview else { return }           // don't silently swap dest §8
+        selection.select(eventId: id, source: .marker)
+        sheetExpanded = false
+        camera.shiftUpForSheet()   // keep marker visible above sheet (P4-002)
+    }
+
+    private func handleSelectCluster(_ cluster: ClusterPoint) {
+        camera.zoomIn(on: Coordinate(lat: cluster.lat, lng: cluster.lng))
+    }
+
+    private func handleSearchSelection(_ item: SearchItem) {
+        withAnimation { overlayMode = .explore }
+        switch item {
+        case .event(let eventId, _, _, _, _, _, _):
+            selection.select(eventId: eventId, source: .search)
+            camera.flyTo(Coordinate(lat: item.coordinate.lat, lng: item.coordinate.lng))
+        case .venue(_, _, _, let lat, let lng):
+            camera.flyTo(Coordinate(lat: lat, lng: lng))
+        }
+    }
+
+    private func toggleStarForSelected() {
+        guard let id = selection.selectedEventId else { return }
+        // Auth-on-action handled inside store; pending action resumes after auth.
+        Task { await stars.toggleStar(id) }
+    }
+
+    private func beginRouteForSelected() {
+        guard let detail = selection.detail ?? selection.cachedDetail(for: selection.selectedEventId ?? UUID()) else {
+            selection.reload()
+            return
+        }
+        Task {
+            await routes.requestPreview(destination: detail.routeDestination,
+                                        modes: TravelMode.allCases,
+                                        eventId: detail.id)
+            withAnimation(.spring(response: 0.4)) { overlayMode = .routePreview }
+        }
+    }
+
+    private func closeRoute() {
+        routes.close()
+        withAnimation { overlayMode = .explore }
+    }
+
+    private func recordTicketClick() {
+        guard let d = selection.detail, let url = d.ticketUrl else { return }
+        env.analytics.track(.ticketClicked, [
+            "event_id": d.id.uuidString,
+            "starred": stars.isStarred(d.id) ? "true" : "false",
+        ])
+        #if canImport(UIKit)
+        UIApplication.shared.open(url)
+        #endif
+    }
+
+    // MARK: Create mode --------------------------------------------------------
+
+    private func beginCreate(source: String = "plus_button") {
+        guard env.flags.native_event_creation_enabled else { return }
+        selection.clearSelection()
+        routes.close()
+        create.begin(source: source)
+        withAnimation { overlayMode = .createLocation }
+    }
+
+    private func beginCreateFromEmptyState() { beginCreate(source: "empty_state") }
+
+    private func proceedWithPin() {
+        guard let pin = create.pinCoordinate else { return }
+        create.dropPin(at: pin)
+        withAnimation { overlayMode = .explore }
+    }
+
+    private func cancelCreate() {
+        create.cancel()
+        withAnimation { overlayMode = .explore }
+    }
+
+    // MARK: Camera helpers -----------------------------------------------------
+
+    private func centerOnDefaultCity() {
+        camera.flyTo(env.city.center, spanDelta: nil, preserveFollow: false)
+    }
+
+    private func recenter() {
+        env.locationService.refreshLocation()
+        if let c = env.locationService.currentCoordinate {
+            camera.flyTo(c, spanDelta: nil, preserveFollow: true)
+        } else {
+            camera.flyTo(env.city.center, spanDelta: nil, preserveFollow: false)
+        }
+    }
+
+    private func expandSearchArea() {
+        camera.zoomOut()
+    }
+}
+
+// MARK: - Reachability (offline banner, P1-009)
+
+final class Reachability: ObservableObject {
+    @Published var isOnline = true
+    private let monitor = NWPathMonitor()
+    private let queue = DispatchQueue(label: "heat.reachability")
+
+    init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor [weak self] in
+                self?.isOnline = path.status == .satisfied
+            }
+        }
+        monitor.start(queue: queue)
+    }
+
+    deinit { monitor.cancel() }
+}
