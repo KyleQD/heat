@@ -77,17 +77,21 @@ jobs:
         working-directory: apps/ios
         run: |
           set -o pipefail
+          set -o pipefail
           xcodebuild build \
             -project Heat.xcodeproj \
             -scheme Heat \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/build.log | grep -E "error:|warning:|BUILD" || true
+          grep -q "BUILD SUCCEEDED" /tmp/build.log
       - name: Unit tests via app scheme
         working-directory: apps/ios
         run: |
+          set -o pipefail
           set -o pipefail
           xcodebuild test \
             -project Heat.xcodeproj \
             -scheme Heat \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/test.log | grep -E "Test Case|error:|TEST" || true
+          grep -q "TEST SUCCEEDED" /tmp/test.log

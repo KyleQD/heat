@@ -34,7 +34,7 @@ struct HeatMapScreen: View {
             chromeLayer
             bottomArea
         }
-        .overlay(alternativeSheet)
+        .overlay { alternativeSheet() }
         .sheet(isPresented: createDetailsBinding) {
             CreateEventSheet(onClose: cancelCreate)
         }
@@ -76,8 +76,16 @@ struct HeatMapScreen: View {
             topControls
             statusRow
             Spacer()
-            if case .failed = discovery.state { errorBanner }
+            if showsLoadError {
+                errorBanner
+                    .padding(.horizontal, 24)
+            }
         }
+    }
+
+    private var showsLoadError: Bool {
+        if case .failed = discovery.state { return true }
+        return false
     }
 
     private var statusRow: some View {
