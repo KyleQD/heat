@@ -43,7 +43,7 @@ jobs:
           npx tsc --noEmit -p .
       - name: Dependency audit (prod deps, high+)
         working-directory: .
-        run: npm audit --omit-dev --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
       - name: Migrate + seed
         run: |
           npx tsx src/db/migrateCli.ts up
