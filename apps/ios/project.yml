@@ -23,8 +23,6 @@ targets:
     platform: iOS
     sources:
       - path: Heat
-        excludes:
-          - "**/*.xcprivacy.bak"
     dependencies:
       - package: HeatKit
         product: HeatKit
@@ -47,7 +45,7 @@ targets:
         Release:
           # Phase B: CI injects HEAT_RELEASE_API_URL; a placeholder in a
           # release binary fails fast at boot (see AppEnvironment).
-          HEAT_API_BASE_URL: ${HEAT_RELEASE_API_URL:-https://unset.release.api.invalid}
+          HEAT_API_BASE_URL: "${HEAT_RELEASE_API_URL:-https://unset.release.api.invalid}"
     info:
       path: Heat/Info.plist
       properties:
@@ -69,9 +67,7 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: Heat
-        excludes:
-          - "**/*.xcprivacy.bak"Kit/Tests/HeatKitTests
+      - path: HeatKit/Tests/HeatKitTests
     dependencies:
       - target: Heat
       - package: HeatKit

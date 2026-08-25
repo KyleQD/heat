@@ -3,6 +3,15 @@ import XCTest
 
 // MARK: - Fixtures
 
+
+/// Thread-safe capture box for handler closures (@Sendable).
+final class CaptureBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [String] = []
+    func append(_ s: String) { lock.lock(); items.append(s); lock.unlock() }
+    var all: [String] { lock.lock(); defer { lock.unlock() }; return items }
+}
+
 enum Fixtures {
     static func mapEvent(
         id: UUID = UUID(), title: String = "Test Event",
@@ -93,17 +102,17 @@ final class APIClientTests: XCTestCase {
     }
 
     func testSessionMintedOnFirstWriteAndReused() async throws {
-        var sessionCalls = 0
-        var starCalls = 0
+        let sessionCalls = CaptureBox()
+        let starCalls = CaptureBox()
         let client = APIClient(baseURL: URL(string: "https://api.test")!)
         client.handler = { req in
             switch (req.httpMethod ?? "", req.url!.path) {
             case ("POST", "/v1/auth/session"):
-                sessionCalls += 1
+                sessionCalls.append("s")
                 return (#"{"token":"tok-1"}"#.data(using: .utf8)!,
                         HTTPURLResponse(url: req.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
             case ("PUT", _):
-                starCalls += 1
+                starCalls.append("★")
                 XCTAssertTrue((req.value(forHTTPHeaderField: "Authorization") ?? "").contains("tok-1"))
                 return (#"{"eventId":"33333333-3333-3333-8333-333333333333","starred":true,"starCount":5}"#.data(using: .utf8)!,
                         HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
@@ -114,14 +123,14 @@ final class APIClientTests: XCTestCase {
         }
         _ = try await client.star(eventId: UUID())
         _ = try await client.star(eventId: UUID())
-        XCTAssertEqual(sessionCalls, 1, "session minted once")
-        XCTAssertEqual(starCalls, 2)
+        XCTAssertEqual(sessionCalls.all.count, 1, "session minted once")
+        XCTAssertEqual(starCalls.all.count, 2)
     }
 
     func testCreateCarriesCallerSuppliedIdempotencyKey() async throws {
         // R2-003 — the caller owns the attempt key; identical drafts from
         // different attempts use different keys by construction.
-        var captured: [String] = []
+        let captured = CaptureBox()
         let client = APIClient(baseURL: URL(string: "https://api.test")!)
         client.handler = { req in
             if let key = req.value(forHTTPHeaderField: "Idempotency-Key") {
@@ -146,9 +155,9 @@ final class APIClientTests: XCTestCase {
         let attemptKey = "ios-test-attempt-1"
         _ = try await client.createEvent(draft: draft, idempotencyKey: attemptKey)
         _ = try await client.createEvent(draft: draft, idempotencyKey: attemptKey)
-        XCTAssertEqual(captured.count, 2, "both sends carried the header")
-        XCTAssertEqual(captured.first, attemptKey)
-        XCTAssertEqual(captured.last, attemptKey, "retry of the SAME attempt reuses the key verbatim")
+        XCTAssertEqual(captured.all.count, 2, "both sends carried the header")
+        XCTAssertEqual(captured.all.first, attemptKey)
+        XCTAssertEqual(captured.all.last, attemptKey, "retry of the SAME attempt reuses the key verbatim")
         XCTAssertNotEqual(attemptKey, "ios-test-attempt-2")
     }
 }

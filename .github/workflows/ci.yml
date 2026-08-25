@@ -41,6 +41,10 @@ jobs:
           npx tsc --noEmit -p ../../packages/config
           npx tsc --noEmit -p ../../packages/api-contracts
           npx tsc --noEmit -p .
+      - name: Migrate + seed
+        run: |
+          npx tsx src/db/migrateCli.ts up
+          npx tsx seeds/las_vegas.ts
       - name: Unit + integration tests
         run: npx vitest run
 

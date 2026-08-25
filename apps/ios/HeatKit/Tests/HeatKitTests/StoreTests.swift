@@ -58,12 +58,17 @@ final class StoreTests: XCTestCase {
      "routeDestination":{"lat":36.1255,"lng":-115.1688},"canEdit":false,"canReport":true,"canClaim":true,"sourceCount":2}
     """
 
-    private var analyticsEvents: [String] = []
+    private final class NamesBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var names: [String] = []
+        func append(_ n: String) { lock.lock(); names.append(n); lock.unlock() }
+        var all: [String] { lock.lock(); defer { lock.unlock() }; return names }
+    }
+    private let analyticsEvents = NamesBox()
 
     private func makeStores() -> (APIClient, DiscoveryStore, SelectionStore, StarStore, RouteStore, SessionStore, CreateStore) {
-        analyticsEvents = []
         let client = makeClient()
-        let analytics = AnalyticsClient(sink: { [weak self] e in self?.analyticsEvents.append(e.name) })
+        let analytics = AnalyticsClient(sink: { [analyticsEvents] e in analyticsEvents.append(e.name) })
         let discovery = DiscoveryStore(api: client, analytics: analytics)
         let selection = SelectionStore(api: client, analytics: analytics)
         let session = SessionStore(api: client)
@@ -83,7 +88,7 @@ final class StoreTests: XCTestCase {
         await stars.toggleStar(id)
         XCTAssertTrue(stars.isStarred(id))
         XCTAssertEqual(stars.counts[id], 99, "reconciled with server count")
-        XCTAssertTrue(analyticsEvents.isEmpty || true)
+        XCTAssertTrue(analyticsEvents.all.isEmpty || true)
     }
 
     func testUnstarRollsBackOnFailure() async {
