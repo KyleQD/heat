@@ -214,6 +214,19 @@ public struct RouteOption: Codable, Hashable, Equatable, Sendable {
     public let distanceMeters: Int
     public let polyline: String?
     public let provider: String
+
+    /// Public memberwise init so the app target can build enhanced options.
+    public init(mode: TravelMode,
+                durationSeconds: Int,
+                distanceMeters: Int,
+                polyline: String?,
+                provider: String) {
+        self.mode = mode
+        self.durationSeconds = durationSeconds
+        self.distanceMeters = distanceMeters
+        self.polyline = polyline
+        self.provider = provider
+    }
 }
 
 public struct RoutePreviewResponse: Codable, Equatable, Sendable {
