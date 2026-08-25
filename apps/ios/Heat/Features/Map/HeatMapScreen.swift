@@ -30,67 +30,11 @@ struct HeatMapScreen: View {
 
     var body: some View {
         ZStack {
-            MapCanvas(
-                events: presentedEvents,
-                clusters: overlayMode == .explore ? discovery.clusters : [],
-                heatPoints: env.flags.map_heat_layer_enabled ? discovery.heatPoints : [],
-                routePolyline: routePolylineCoords,
-                destination: routeDestination,
-                isCreateMode: overlayMode == .createLocation,
-                pinCoordinate: create.pinCoordinate,
-                selectedEventId: selection.selectedEventId,
-                starredIds: stars.starredIds,
-                camera: camera,
-                onViewportChange: handleViewport,
-                onSelectEvent: handleSelectEvent,
-                onSelectCluster: handleSelectCluster
-            )
-            .ignoresSafeArea()
-
-            VStack {
-                topControls
-                HStack {
-                    stalePill
-                    Spacer()
-                    Button {
-                        withAnimation { showNearbyList = true }
-                    } label: {
-                        Image(systemName: "list.bullet")
-                            .font(.system(size: 15))
-                            .padding(9)
-                            .background(.ultraThinMaterial, in: Capsule())
-                    }
-                    .accessibilityLabel("Browse nearby events as a list")
-                    HeatLegend()
-                        .environmentObject(env)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 6)
-                if showOfflineBanner { OfflineBanner().padding(.horizontal, 14).padding(.top, 6) }
-                if env.locationService.phase == .denied || env.locationService.authorizationState == .denied {
-                    HStack {
-                        Spacer()
-                        LocationDeniedCard().padding(.trailing, 16)
-                    }
-                    .padding(.top, 6)
-                }
-                Spacer()
-                if case .failed = discovery.state { errorBanner }
-            }
-
+            mapLayer
+            chromeLayer
             bottomArea
         }
         .overlay(alternativeSheet)
-        .onAppear {
-            if discovery.events.isEmpty {
-                centerOnDefaultCity()
-            }
-            env.locationService.refreshLocation()
-        }
-        .onChange(of: reachability.isOnline) { online in
-            showOfflineBanner = !online
-            if online { Task { await discovery.refresh() } }
-        }
         .sheet(isPresented: createDetailsBinding) {
             CreateEventSheet(onClose: cancelCreate)
         }
@@ -100,49 +44,87 @@ struct HeatMapScreen: View {
                 selection.select(eventId: eventId, source: .search)
             }
         }
-        .onChange(of: env.pendingDeepLinkEventId) { pending in
-            guard let id = pending else { return }
-            withAnimation { overlayMode = .explore }
-            selection.select(eventId: id, source: .search)
-        }
-        .onChange(of: discovery.events) { events in
-            stars.reconcile(from: events)
-        }
-        .onChange(of: selection.detail?.stars) { starsInfo in
-            guard let d = selection.detail, let info = starsInfo else { return }
-            stars.reconcile(id: d.id, starred: info.starredByViewer, count: info.count)
-        }
-        .onChange(of: selection.detail?.id) { detailId in
-            // Deep-link fly-to once the target detail lands.
-            if let detailId, env.pendingDeepLinkEventId == detailId,
-               let d = selection.detail {
-                camera.flyTo(d.location)
-                env.pendingDeepLinkEventId = nil
-            }
-        }
-        // P4-010 selected active events refresh faster than background map.
-        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { tick in
-            nowTick = tick
-            guard overlayMode == .explore else { return }
-            selection.refreshIfStale()
+        .onAppear(perform: initialSetup)
+        .onChange(of: reachability.isOnline, perform: handleReachabilityChange)
+        .onChange(of: env.pendingDeepLinkEventId, perform: handlePendingDeepLink)
+        .onChange(of: selection.detail?.id, perform: handleDetailArrival)
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect(),
+                   perform: handleTick)
+    }
+
+    private var mapLayer: some View {
+        MapCanvas(
+            events: presentedEvents,
+            clusters: overlayMode == .explore ? discovery.clusters : [],
+            heatPoints: env.flags.map_heat_layer_enabled ? discovery.heatPoints : [],
+            routePolyline: routePolylineCoords,
+            destination: routeDestination,
+            isCreateMode: overlayMode == .createLocation,
+            pinCoordinate: create.pinCoordinate,
+            selectedEventId: selection.selectedEventId,
+            starredIds: stars.starredIds,
+            camera: camera,
+            onViewportChange: handleViewport,
+            onSelectEvent: handleSelectEvent,
+            onSelectCluster: handleSelectCluster
+        )
+        .ignoresSafeArea()
+    }
+
+    private var chromeLayer: some View {
+        VStack(spacing: 0) {
+            topControls
+            statusRow
+            Spacer()
+            if case .failed = discovery.state { errorBanner }
         }
     }
 
-    /// Details sheet opens once a location mode is confirmed (M6 over map).
-    private var createDetailsBinding: Binding<Bool> {
-        Binding(get: {
-            // R2-005 — `.published` intentionally CLOSES the sheet: the store
-            // already selected the new event and reset the draft.
-            switch create.step {
-            case .requiredDetails, .optionalDetails, .checkingDuplicates,
-                 .reviewDuplicates, .publishing:
-                return true
-            default:
-                return false
+    private var statusRow: some View {
+        VStack(spacing: 6) {
+            if showOfflineBanner { OfflineBanner().padding(.horizontal, 14) }
+            HStack(spacing: 8) {
+                stalePill
+                Spacer()
+                NearbyListButton { withAnimation { showNearbyList = true } }
+                HeatLegend().environmentObject(env)
             }
-        }, set: { shown in
-            if !shown { cancelCreate() }
-        })
+            .padding(.horizontal, 16)
+            if env.locationService.phase == .denied || env.locationService.authorizationState == .denied {
+                HStack { Spacer(); LocationDeniedCard().padding(.trailing, 16) }
+            }
+        }
+        .padding(.top, 6)
+    }
+
+    private func initialSetup() {
+        if discovery.events.isEmpty { centerOnDefaultCity() }
+        env.locationService.refreshLocation()
+    }
+
+    private func handleReachabilityChange(_ online: Bool) {
+        showOfflineBanner = !online
+        if online { Task { await discovery.refresh() } }
+    }
+
+    private func handlePendingDeepLink(_ pending: UUID?) {
+        guard let id = pending else { return }
+        withAnimation { overlayMode = .explore }
+        selection.select(eventId: id, source: .search)
+    }
+
+    private func handleDetailArrival(_ detailId: UUID?) {
+        if let detailId, env.pendingDeepLinkEventId == detailId,
+           let d = selection.detail {
+            camera.flyTo(d.location)
+            env.pendingDeepLinkEventId = nil
+        }
+    }
+
+    private func handleTick(_ tick: Date) {
+        nowTick = tick
+        guard overlayMode == .explore else { return }
+        selection.refreshIfStale()
     }
 
     // MARK: Derived data -----------------------------------------------------

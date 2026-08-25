@@ -27,6 +27,11 @@ final class MapCameraCommand: ObservableObject {
         handler?(.fly(coordinate, follow: false))
     }
 
+    /// Convenience overload matching `flyTo(_:)` single-argument call sites.
+    func flyTo(_ coordinate: Coordinate) {
+        handler?(.fly(coordinate, follow: false))
+    }
+
     func zoomIn(on coordinate: Coordinate) { handler?(.zoomIn(coordinate)) }
     func zoomOut() { handler?(.zoomOut) }
     func shiftUpForSheet() { handler?(.shiftUpForSheet) }

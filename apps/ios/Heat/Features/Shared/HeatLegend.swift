@@ -37,3 +37,17 @@ struct HeatLegend: View {
         [(.surging, "Surging"), (.hot, "Hot"), (.warm, "Warming"), (.inactive, "Quiet")]
     }
 }
+
+struct NearbyListButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "list.bullet")
+                .font(.system(size: 15))
+                .padding(9)
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+        .accessibilityLabel("Browse nearby events as a list")
+    }
+}
