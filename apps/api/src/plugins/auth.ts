@@ -43,6 +43,24 @@ export function extractToken(req: FastifyRequest): string | null {
   return null;
 }
 
+/** last_seen_at write throttle: at most one UPDATE per token per minute. */
+const lastSeenWrites = new Map<string, number>();
+const LAST_SEEN_INTERVAL_MS = 60_000;
+
+function shouldTouchSession(token: string, now: number): boolean {
+  const last = lastSeenWrites.get(token) ?? 0;
+  if (now - last < LAST_SEEN_INTERVAL_MS) return false;
+  lastSeenWrites.set(token, now);
+  // Bounded memory: prune occasionally.
+  if (lastSeenWrites.size > 5000) {
+    const cutoff = now - LAST_SEEN_INTERVAL_MS * 2;
+    for (const [t, ts] of lastSeenWrites) {
+      if (ts < cutoff) lastSeenWrites.delete(t);
+    }
+  }
+  return true;
+}
+
 export async function resolveUser(
   db: Queryable,
   req: FastifyRequest,
@@ -62,10 +80,11 @@ export async function resolveUser(
     req.user = null;
     return null;
   }
-  await db.query(
-    "UPDATE sessions SET last_seen_at = now() WHERE token = $1",
-    [token],
-  );
+  if (shouldTouchSession(token, Date.now())) {
+    await db
+      .query("UPDATE sessions SET last_seen_at = now() WHERE token = $1", [token])
+      .catch(() => undefined); // freshness is best-effort; never block reads
+  }
   req.user = { userId: row.user_id, sessionId: token };
   return req.user;
 }

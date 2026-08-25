@@ -134,7 +134,20 @@ async function insertEvent(
        $18,$19,$20,$21,$22,
        $23,1
      )
-     ON CONFLICT (id) DO NOTHING`,
+     -- Deterministic IDs + refreshed times: reruns keep demo data live.
+     ON CONFLICT (id) DO UPDATE SET
+       title = EXCLUDED.title,
+       normalized_title = EXCLUDED.normalized_title,
+       starts_at = EXCLUDED.starts_at,
+       ends_at = EXCLUDED.ends_at,
+       status = EXCLUDED.status,
+       visibility_status = EXCLUDED.visibility_status,
+       heat_score = EXCLUDED.heat_score,
+       heat_confidence = EXCLUDED.heat_confidence,
+       attendance_low = EXCLUDED.attendance_low,
+       attendance_high = EXCLUDED.attendance_high,
+       attendance_estimate_type = EXCLUDED.attendance_estimate_type,
+       updated_at = now()`,
     [
       r.id,
       e.title,

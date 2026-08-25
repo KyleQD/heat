@@ -73,23 +73,23 @@ afterAll(async () => {
 const authHeaders = () => ({ authorization: `Bearer ${token}` });
 
 async function firstMapEvent(): Promise<{ id: string; title: string }> {
-  const res = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=15&window=now` });
+  const res = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=now` });
   return (res.json() as { events: Array<{ id: string; title: string }> }).events[0]!;
 }
 
 describe("map response cache (doc 48)", () => {
   it("serves identical anonymous queries from cache (same generatedAt)", async () => {
-    const r1 = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=15&window=tonight` });
-    const r2 = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=15&window=tonight` });
+    const r1 = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=tonight` });
+    const r2 = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=tonight` });
     expect(r2.json().generatedAt).toBe(r1.json().generatedAt);
   });
 
   it("never caches user-specific star state across users", async () => {
     // Authenticated request must bypass cache and get a fresh generatedAt.
-    const anon = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=15&window=now` });
+    const anon = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=now` });
     const authed = await app.inject({
       method: "GET",
-      url: `/v1/map/events?${BBOX}&zoom=15&window=now&includeStarredState=true`,
+      url: `/v1/map/events?${BBOX}&zoom=10&window=now&includeStarredState=true`,
       headers: authHeaders(),
     });
     expect(new Date(authed.json().generatedAt).getTime())
@@ -97,7 +97,7 @@ describe("map response cache (doc 48)", () => {
   });
 
   it("invalidates on canonical create", async () => {
-    const before = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=15&window=now` });
+    const before = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=now` });
     await app.inject({
       method: "POST",
       url: "/v1/events",
@@ -110,7 +110,7 @@ describe("map response cache (doc 48)", () => {
         location: { lat: 36.13, lng: -115.14 },
       },
     });
-    const after = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=15&window=now` });
+    const after = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=now` });
     expect(after.json().events.length).toBeGreaterThan(before.json().events.length);
   });
 });
@@ -338,7 +338,7 @@ describe("query-plan guard (TC-P2-004 automated)", () => {
     // Reach into the pool through the running app's map query EXPLAIN.
     const res = await app.inject({
       method: "GET",
-      url: `/v1/map/events?${BBOX}&zoom=15&window=now&nocache=${Date.now()}`,
+      url: `/v1/map/events?${BBOX}&zoom=10&window=now&nocache=${Date.now()}`,
     });
     expect(res.statusCode).toBe(200);
     // Direct EXPLAIN via the module's own pool.

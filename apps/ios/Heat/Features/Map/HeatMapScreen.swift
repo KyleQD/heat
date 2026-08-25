@@ -22,6 +22,7 @@ struct HeatMapScreen: View {
 
     @State private var overlayMode: OverlayMode = .explore
     @State private var showOfflineBanner = false
+    @State private var showNearbyList = false
     @ObservedObject private var reachability = Reachability()
 
     /// Shared camera commands (also driven by deep links).
@@ -48,6 +49,23 @@ struct HeatMapScreen: View {
 
             VStack {
                 topControls
+                HStack {
+                    stalePill
+                    Spacer()
+                    Button {
+                        withAnimation { showNearbyList = true }
+                    } label: {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 15))
+                            .padding(9)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
+                    .accessibilityLabel("Browse nearby events as a list")
+                    HeatLegend()
+                        .environmentObject(env)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
                 if showOfflineBanner { OfflineBanner().padding(.horizontal, 14).padding(.top, 6) }
                 if env.locationService.phase == .denied || env.locationService.authorizationState == .denied {
                     HStack {
@@ -76,6 +94,12 @@ struct HeatMapScreen: View {
         .sheet(isPresented: createDetailsBinding) {
             CreateEventSheet(onClose: cancelCreate)
         }
+        .sheet(isPresented: $showNearbyList) {
+            NearbyListSheet(onClose: { showNearbyList = false }) { eventId in
+                showNearbyList = false
+                selection.select(eventId: eventId, source: .search)
+            }
+        }
         .onChange(of: env.pendingDeepLinkEventId) { pending in
             guard let id = pending else { return }
             withAnimation { overlayMode = .explore }
@@ -90,7 +114,8 @@ struct HeatMapScreen: View {
             }
         }
         // P4-010 selected active events refresh faster than background map.
-        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { tick in
+            nowTick = tick
             guard overlayMode == .explore else { return }
             selection.refreshIfStale()
         }
@@ -222,9 +247,27 @@ struct HeatMapScreen: View {
 
     private var errorBanner: some View {
         InlineError(message: "Couldn't load HEAT right now.") {
-            Task { await discovery.refresh() }
+            Task { await discovery.retryNow() }
         }
         .padding(.horizontal, 24)
+    }
+
+    /// Freshness indicator (P12 refresh rules): subtle "updated X ago" when
+    /// serving stale data after an offline period.
+    @State private var nowTick = Date()
+    private var stalePill: some View {
+        Group {
+            if case .stale(let at) = discovery.state {
+                let mins = Int(nowTick.timeIntervalSince(at) / 60)
+                Label(mins < 1 ? "updated moments ago" : "updated \(mins)m ago",
+                      systemImage: "clock.arrow.circlepath")
+                    .font(.caption2)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .transition(.opacity)
+            }
+        }
     }
 
     // MARK: Sheets ------------------------------------------------------------
@@ -258,6 +301,12 @@ struct HeatMapScreen: View {
     // MARK: Interactions ------------------------------------------------------
 
     private func handleViewport(_ region: ViewportRegion) {
+        // M5: while placing a location, map center IS the pin (drag-to-place).
+        if overlayMode == .createLocation {
+            create.pinCoordinate = region.center
+            return   // no viewport fetches during create mode
+        }
+        lastKnownCenter = region.center
         guard overlayMode != .search else { return }
         let query = APIClient.MapQuery(
             north: region.north, south: region.south, east: region.east, west: region.west,
@@ -334,13 +383,21 @@ struct HeatMapScreen: View {
         selection.clearSelection()
         routes.close()
         create.begin(source: source)
+        // Seed the pin from wherever the map is currently centered so "Next"
+        // works even before the user drags.
+        if create.pinCoordinate == nil {
+            create.pinCoordinate = lastKnownCenter
+        }
         withAnimation { overlayMode = .createLocation }
     }
+
+    /// Last region center reported by the canvas (also used for recenter UX).
+    @State private var lastKnownCenter: Coordinate?
 
     private func beginCreateFromEmptyState() { beginCreate(source: "empty_state") }
 
     private func proceedWithPin() {
-        guard let pin = create.pinCoordinate else { return }
+        guard let pin = create.pinCoordinate ?? lastKnownCenter else { return }
         create.dropPin(at: pin)
         withAnimation { overlayMode = .explore }
     }

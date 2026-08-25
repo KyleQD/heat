@@ -184,8 +184,32 @@ public final class DiscoveryStore: ObservableObject {
             } else if key == lastQueryKey {
                 state = .failed(error)
                 analytics.track(.mapDataLoadFailed, ["error_code": error.code.rawValue])
+                scheduleRetry()
             }
         } catch {}
+    }
+
+    /// P1-009 resilience: one automatic retry after a failure (exponential
+    /// backoff capped at 30s); user Retry resets the schedule.
+    private var retryTask: Task<Void, Never>?
+    private var retryDelay: UInt64 = 4_000_000_000
+
+    public func retryNow() async {
+        retryTask?.cancel()
+        retryDelay = 4_000_000_000
+        lastQueryKey = nil   // allow refetch of same key
+        await fetch()
+    }
+
+    private func scheduleRetry() {
+        retryTask?.cancel()
+        let delay = retryDelay
+        retryDelay = min(retryDelay * 2, 30_000_000_000)
+        retryTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delay)
+            guard !Task.isCancelled else { return }
+            await self?.retryNow()
+        }
     }
 
     private func ingest(_ response: MapEventsResponse, authenticated: Bool, includeStarredState: Bool) {

@@ -267,11 +267,25 @@ async function loadSignals(db: Queryable, eventId: string): Promise<HeatSignals 
   };
 }
 
+export interface RecalcOutcome {
+  result: HeatResult | null;
+  /** True when the score moved >= 2 points (doc 48 cache invalidation trigger). */
+  changedMaterially: boolean;
+}
+
 /** Recalculates one event: writes a snapshot + updates canonical columns. */
-export async function recalculateEventHeat(db: Queryable, eventId: string): Promise<HeatResult | null> {
+export async function recalculateEventHeat(db: Queryable, eventId: string): Promise<RecalcOutcome | null> {
   const signals = await loadSignals(db, eventId);
   if (!signals) return null;
   const result = computeHeat(signals);
+
+  const prior = await db.query<{ score: string | null }>(
+    "SELECT heat_score AS score FROM events WHERE id = $1",
+    [eventId],
+  );
+  const priorScore = prior.rows[0]?.score != null ? Number(prior.rows[0].score) : null;
+  const changedMaterially =
+    priorScore == null || Math.abs(priorScore - result.score) >= 2;
 
   await db.query(
     `UPDATE events SET
@@ -297,7 +311,7 @@ export async function recalculateEventHeat(db: Queryable, eventId: string): Prom
       JSON.stringify({ phase: result.phase }),
     ],
   );
-  return result;
+  return { result, changedMaterially };
 }
 
 /**
@@ -307,6 +321,12 @@ export async function recalculateEventHeat(db: Queryable, eventId: string): Prom
 export class HeatRecalculator {
   private dirty = new Set<string>();
   private timer: NodeJS.Timeout | null = null;
+  /** Called when a sweep materially moves scores (cache invalidation hook). */
+  onMaterialChange: (() => void) | null = null;
+
+  get dirtyCount(): number {
+    return this.dirty.size;
+  }
 
   constructor(private readonly getDb: () => Queryable, private readonly intervalMs = 20_000) {}
 
@@ -331,14 +351,17 @@ export class HeatRecalculator {
     if (this.dirty.size === 0) return 0;
     const ids = [...this.dirty];
     this.dirty.clear();
+    let anyChanged = false;
     for (const id of ids) {
       try {
-        await recalculateEventHeat(this.getDb(), id);
+        const outcome = await recalculateEventHeat(this.getDb(), id);
+        if (outcome?.changedMaterially) anyChanged = true;
       } catch {
         // Re-arm for the next sweep; scoring must never break mutations.
         this.dirty.add(id);
       }
     }
+    if (anyChanged && this.onMaterialChange) this.onMaterialChange();
     return ids.length;
   }
 }

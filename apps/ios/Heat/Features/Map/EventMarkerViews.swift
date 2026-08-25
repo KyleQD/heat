@@ -71,6 +71,9 @@ final class EventMarkerView: MKAnnotationView {
 
     private func commonInit() {
         frame = CGRect(x: 0, y: 0, width: 36, height: 36)
+        // MapKit merges colliding markers between the server's cluster bands,
+        // so dense blocks never render as overlapping dots (UX §5 Z1/Z2).
+        clusteringIdentifier = "heatEvent"
         layer.addSublayer(pulseLayer)
         layer.addSublayer(ringLayer)
         layer.addSublayer(dotLayer)
@@ -134,6 +137,8 @@ final class EventMarkerView: MKAnnotationView {
     }
 
     private func applySelectionLook() {
+        // The selected marker must never be absorbed into a cluster (P12 L4).
+        clusteringIdentifier = isSelectedState ? nil : "heatEvent"
         UIView.animate(withDuration: UIAccessibility.isReduceMotionEnabled ? 0 : 0.18) {
             self.transform = self.isSelectedState ? CGAffineTransform(scaleX: 1.35, y: 1.35) : .identity
             self.layer.zPosition = self.isSelectedState ? 1000 : 0

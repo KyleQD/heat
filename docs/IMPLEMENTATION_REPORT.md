@@ -163,3 +163,41 @@ Canonical tracker updated in `docs/PROGRESS_TRACKER.md`.
 | Low | Full Xcode still required for final iOS binary (CLT environment). | mobile |
 | Medium | Engine weights are seed hypotheses; move to DB-backed config rows before shadow-model rollout (doc 46). | data-science |
 | Low | Cache is single-instance in-memory; horizontal deployments need Redis or sticky map nodes. | backend |
+
+---
+
+# Audit & Optimization Round — 2026-08-24 (map launch readiness)
+
+## Audit findings → fixes
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 1 | Create-mode pin never bound from map drag — "Next" silently dead | **Blocker** | Viewport center live-binds to `create.pinCoordinate` in create mode; seeded from current center; viewport fetches suppressed while creating |
+| 2 | Time-overlap included events that ended up to 4h *before* the window | High | Overlap anchored to windowStart |
+| 3 | `starredOnly` filtered AFTER the density LIMIT — starred users could lose their own events at cap | High | Filter pushed INTO SQL before LIMIT |
+| 4 | No world-size/zoom-inconsistent bbox rejection (doc 48 acceptance) | High | Absolute caps + implied-zoom consistency check (`log2(360/span)` ± 4.5) |
+| 5 | Map/detail/search had NO rate limits (DoS + SLO risk) | High | Preset limits on every public route (map 240/min/IP); headers verified |
+| 6 | Cache stampede under concurrent misses; no HEAT-change invalidation | Medium | Single-flight coalescing; epoch bump only when score moves ≥2pts (doc 48 threshold trigger) |
+| 7 | Session writes per request; expired sessions never cleaned; no statement timeout | Medium | last_seen throttled 1/min/token; hourly cleanup; `statement_timeout=8s` pool-wide |
+| 8 | app.ts 730-line monolith | Structure | Split into 7 route modules + slim composition root; behavior locked by tests |
+
+## iOS map enhancements
+
+- Follow-user camera state machine (pan breaks follow; recenter restores; programmatic moves exempt)
+- Stale-data pill ("updated Xm ago") + auto-retry exponential backoff (4s→30s cap) after load failure
+- Heat legend (collapsible, glyph+color pairs, a11y labeled)
+- Zoom-aware heat overlay radii (160m street / 320m neighborhood / 520m metro bands)
+- Client-side collision clustering via MK clusteringIdentifier for dense mid-zoom blocks; selected marker exempt; cluster tap zooms-only
+- **Real road routes**: MKDirections upgrades the selected mode's ETA/distance/polyline on-device; server estimate remains the guaranteed fallback (GO never degrades)
+- Nearby list sheet: distance-sorted canonical events as the accessibility/list-first fallback (doc 02 §16)
+- Analytics queue flushes on scene background
+
+## Verification
+
+Backend **66 passed** (serialized DB suites via vitest fileParallelism=false) ·
+HeatKit **41/41** · typechecks clean · UI parse clean · xcodegen regenerated ·
+Live smoke: world-bbox→400, ratelimit headers present, /v1/metrics scraping,
+map 90 events @ zoom10.
+
+New doc: `docs/LAUNCH_READINESS.md` — verdict: ready for internal pilot/closed beta;
+public beta blocked only by deploy, device QA pass, store assets, SLO baselines.

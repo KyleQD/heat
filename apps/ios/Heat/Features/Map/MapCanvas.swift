@@ -6,6 +6,8 @@ import HeatKit
 @MainActor
 final class MapCameraCommand: ObservableObject {
     var handler: ((CameraIntent) -> Void)?
+    /// True while the camera tracks the user location; manual pans break it.
+    @Published var followingUser = false
 
     enum CameraIntent {
         case fly(Coordinate, follow: Bool)
@@ -16,6 +18,7 @@ final class MapCameraCommand: ObservableObject {
     }
 
     func flyTo(_ coordinate: Coordinate, spanDelta: Double?, preserveFollow: Bool) {
+        if preserveFollow { followingUser = true }
         handler?(.fly(coordinate, follow: preserveFollow))
     }
 
@@ -144,9 +147,11 @@ struct MKMapViewRepresentable: UIViewRepresentable {
 
 final class CanvasCoordinator: NSObject, MKMapViewDelegate {
 
-    var parent: MKMapViewRepresentable
+    var parent: MKMapViewRepresentable?
     var cameraBound = false
     private weak var mapView: MKMapView?
+    /// Set while applying a programmatic camera intent so we don't mistake it for a gesture.
+    private var followProgrammatic = false
 
     func setMapView(_ map: MKMapView) {
         self.mapView = map
@@ -234,9 +239,11 @@ final class CanvasCoordinator: NSObject, MKMapViewDelegate {
         guard now.timeIntervalSince(lastHeatSync) > 0.8 else { return }
         lastHeatSync = now
         map.removeOverlays(heatOverlays)
+        let zoomBand = currentZoomBand(map)
+        let radiusBase: CLLocationDistance = zoomBand >= 15 ? 160 : zoomBand >= 13 ? 320 : 520
         heatOverlays = points.map { point in
             HeatCircleOverlay(center: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng),
-                              radius: 260 + 340 * point.weight,
+                              radius: radiusBase + radiusBase * point.weight,
                               weight: point.weight)
         }
         map.addOverlays(heatOverlays)
@@ -269,11 +276,16 @@ final class CanvasCoordinator: NSObject, MKMapViewDelegate {
 
     func apply(intent: MapCameraCommand.CameraIntent) {
         guard let map = mapView else { return }
+        followProgrammatic = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.followProgrammatic = false
+        }
         switch intent {
-        case .fly(let coordinate, _):
+        case .fly(let coordinate, let follow):
             let region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: coordinate.lat, longitude: coordinate.lng),
                                             latitudinalMeters: 2500, longitudinalMeters: 2500)
             map.setRegion(region, animated: true)
+            Task { @MainActor in self.parent?.camera.followingUser = follow }
         case .zoomIn(let coordinate):
             var region = map.region
             region.center = CLLocationCoordinate2D(latitude: coordinate.lat, longitude: coordinate.lng)
@@ -331,6 +343,14 @@ final class CanvasCoordinator: NSObject, MKMapViewDelegate {
             view.canShowCallout = false
             return view
         }
+        if let mkCluster = annotation as? MKClusterAnnotation {
+            let id = "client-cluster"
+            let view = (mapView.dequeueReusableAnnotationView(withIdentifier: id) as? ClientClusterView)
+                ?? ClientClusterView(annotation: mkCluster, reuseIdentifier: id)
+            view.configure(with: mkCluster)
+            view.annotation = mkCluster
+            return view
+        }
         if annotation is CreatePinAnnotation {
             let id = "create-pin"
             let view = (mapView.dequeueReusableAnnotationView(withIdentifier: id) as? CreatePinView)
@@ -347,7 +367,10 @@ final class CanvasCoordinator: NSObject, MKMapViewDelegate {
         case let eventAnn as EventAnnotation:
             onSelectEvent(eventAnn.id)
         case let clusterAnn as ClusterAnnotation:
-            onSelectCluster(clusterAnn.cluster)   // clusters zoom, never select (P12)
+            onSelectCluster(clusterAnn.cluster)   // server clusters zoom, never select (P12)
+        case let mkCluster as MKClusterAnnotation:
+            // Client collision-cluster: zoom into its span; still no selection.
+            mapView.setRegion(MKCoordinateRegion(region: mkCluster.region), animated: true)
         default:
             break
         }
@@ -355,6 +378,10 @@ final class CanvasCoordinator: NSObject, MKMapViewDelegate {
 
     func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
         self.mapView = mapView
+        // Manual pan/zoom breaks automatic user-follow (P1-004 camera rules).
+        if let camera = parent?.camera, !followProgrammatic {
+            camera.followingUser = false
+        }
         regionWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in
             self?.emitViewport(mapView)
@@ -368,6 +395,13 @@ final class CanvasCoordinator: NSObject, MKMapViewDelegate {
         self.mapView = mapView
     }
 
+    private var cachedZoomBand: Int = 14
+
+    private func currentZoomBand(_ map: MKMapView) -> Int {
+        let span = max(map.region.span.longitudeDelta, 1e-4)
+        return Int(log2(360.0 / span))
+    }
+
     private func emitViewport(_ map: MKMapView) {
         let region = map.region
         let north = region.center.latitude + region.span.latitudeDelta / 2
@@ -375,7 +409,8 @@ final class CanvasCoordinator: NSObject, MKMapViewDelegate {
         let east = region.center.longitude + region.span.longitudeDelta / 2
         let west = region.center.longitude - region.span.longitudeDelta / 2
         let zoom = log2(360.0 / max(region.span.longitudeDelta, 0.0001))
-        parent.onViewportChange(ViewportRegion(north: north, south: south, east: east, west: west,
+        cachedZoomBand = Int(zoom)
+        parent?.onViewportChange(ViewportRegion(north: north, south: south, east: east, west: west,
                                                zoom: zoom,
                                                center: Coordinate(lat: region.center.latitude,
                                                                   lng: region.center.longitude)))

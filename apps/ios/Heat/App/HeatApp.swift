@@ -1,6 +1,19 @@
 import SwiftUI
 import HeatKit
 
+private struct ScenePhaseFlush: ViewModifier {
+    @EnvironmentObject private var env: AppEnvironment
+    @Environment(\.scenePhase) private var scenePhase
+
+    func body(content: Content) -> some View {
+        content.onChange(of: scenePhase) { phase in
+            if phase == .background {
+                Task { await env.flushAnalytics() }
+            }
+        }
+    }
+}
+
 @main
 struct HeatApp: App {
     @StateObject private var environment = AppEnvironment()
@@ -16,6 +29,7 @@ struct HeatApp: App {
                 .environmentObject(environment.routes)
                 .environmentObject(environment.create)
                 .task { await environment.bootstrap() }
+                .modifier(ScenePhaseFlush())
                 .onOpenURL { url in
                     // heat://event/<id> — open map, load, fly, open sheet (doc 25 §10).
                     if case .event(let id)? = DeepLink.parse(url) {
@@ -81,6 +95,11 @@ final class AppEnvironment: ObservableObject {
                             analytics: analytics, starStore: stars)
         create = CreateStore(api: api, analytics: analytics, session: session,
                              selection: selection, discovery: discovery)
+    }
+
+    /// Telemetry durability: flush queued analytics when leaving foreground.
+    func flushAnalytics() async {
+        await analyticsBatcher.flush()
     }
 
     /// Doc 25 §10: deep link opens map → loads event → flies → opens sheet.

@@ -9,8 +9,49 @@ struct RoutePreviewPanel: View {
     @EnvironmentObject private var selection: SelectionStore
 
     let onClose: () -> Void
+    @StateObject private var enhancer = OnDeviceRouteEnhancer()
+    @State private var enhancedRoute: RouteOption?
+
+    /// Replace the selected mode's estimate with real road data when Apple
+    /// routing succeeds; otherwise the server option stays (GO-AC-005).
+    private func startEnhancement(for response: RoutePreviewResponse, mode: TravelMode) {
+        guard let origin = env.locationService.currentCoordinate,
+              let baseline = response.routes.first(where: { $0.mode == mode }),
+              enhancedRoute?.mode != mode else { return }
+        enhancer.enhance(mode: mode, origin: origin, destination: response.destination) { option in
+            // Only adopt if clearly better than the straight-line estimate.
+            if option.distanceMeters > 0 && option.provider == "apple_ondevice" {
+                enhancedRoute = option
+            }
+            _ = baseline
+        }
+    }
+
+    /// The route actually drawn + measured: enhanced when available.
+    private func displayOption(in response: RoutePreviewResponse, _ mode: TravelMode) -> RouteOption? {
+        if let e = enhancedRoute, e.mode == mode { return e }
+        return response.routes.first(where: { $0.mode == mode })
+    }
 
     var body: some View {
+        content
+            .onAppear {
+                if case .preview(let response, let mode) = routes.phase {
+                    startEnhancement(for: response, mode: mode)
+                }
+            }
+            .onChange(of: routes.phase) { phase in
+                if case .preview(let response, let mode) = phase {
+                    enhancedRoute = nil
+                    startEnhancement(for: response, mode: mode)
+                } else {
+                    enhancedRoute = nil
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         VStack(spacing: 12) {
             switch routes.phase {
             case .idle:
@@ -43,7 +84,7 @@ struct RoutePreviewPanel: View {
                     Text(selection.detail?.title ?? "Destination")
                         .font(.subheadline.weight(.bold))
                         .lineLimit(1)
-                    if let option = response.routes.first(where: { $0.mode == selectedMode }) {
+                    if let option = displayOption(in: response, selectedMode) {
                         Text(GeoMath.etaText(seconds: option.durationSeconds,
                                              meters: option.distanceMeters))
                             .font(.title3.weight(.heavy))

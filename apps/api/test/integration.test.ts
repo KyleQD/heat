@@ -24,7 +24,7 @@ afterAll(async () => {
 });
 
 async function mapQuery(extra = ""): Promise<{ events: Array<Record<string, unknown>>; heatPoints: unknown[]; clusters: Array<{ count: number }> }> {
-  const res = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=15&window=now${extra}` });
+  const res = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=now${extra}` });
   expect(res.statusCode).toBe(200);
   return res.json();
 }
@@ -57,7 +57,7 @@ describe("GEO viewport (GEO-AC-001..006)", () => {
   it("tonight window includes after-midnight event (GEO-AC-003)", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/v1/map/events?${BBOX}&zoom=15&window=tonight`,
+      url: `/v1/map/events?${BBOX}&zoom=10&window=tonight`,
     });
     const titles = (res.json() as { events: Array<{ title: string }> }).events.map((e) => e.title);
     expect(titles).toContain("Late Night Vinyl Sessions");
@@ -66,7 +66,7 @@ describe("GEO viewport (GEO-AC-001..006)", () => {
   it("canceled event is clearly status-marked (GEO-AC-004)", async () => {
     const res = await app.inject({
       method: "GET",
-      url: `/v1/map/events?${BBOX}&zoom=15&window=tonight`,
+      url: `/v1/map/events?${BBOX}&zoom=10&window=tonight`,
     });
     const canceled = (res.json() as { events: Array<{ title: string; status: string }> }).events.find(
       (e) => e.title === "Harbor Lights Acoustic Evening",
@@ -75,7 +75,7 @@ describe("GEO viewport (GEO-AC-001..006)", () => {
   });
 
   it("two same-venue events both render (GEO-AC-005)", async () => {
-    const res = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=15&window=tonight` });
+    const res = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=tonight` });
     const body = res.json() as { events: Array<{ title: string }> };
     const twilight = body.events.filter((e) => String(e.title).startsWith("Twilight Sessions"));
     expect(twilight.length).toBeGreaterThanOrEqual(2);
@@ -122,7 +122,7 @@ describe("stars (STAR-AC-001..006)", () => {
   });
 
   it("never exposes star user identities (TC-P5-004)", async () => {
-    const d = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=15` });
+    const d = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10` });
     expect(d.body).not.toContain("userId");
     expect(d.body).not.toContain("starrers");
   });
@@ -197,14 +197,29 @@ describe("native creation (CRT-AC-001..006)", () => {
   });
 
   it("duplicate candidates surface before publish (CRT-AC-003)", async () => {
+    // Self-contained probe: create the original first so the check never
+    // depends on how long ago static fixtures were seeded.
+    const originalStart = new Date(Date.now() + 9 * 3600_000);
+    await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: `Bearer ${token}`, "x-allow-duplicate": "true", "idempotency-key": `dup-probe-${Date.now()}` },
+      payload: {
+        title: "Dup Probe Original Set",
+        category: "music",
+        startsAt: originalStart.toISOString(),
+        endsAt: new Date(originalStart.getTime() + 2 * 3600_000).toISOString(),
+        location: { lat: 36.1521, lng: -115.2014 },
+      },
+    });
     const res = await app.inject({
       method: "POST",
       url: "/v1/events/duplicate-check",
       payload: {
-        title: "Red Rocks Revue",
+        title: "Dup Probe Original Set!",
         category: "music",
-        startsAt: new Date(Date.now() + 8 * 3600_000).toISOString(),
-        endsAt: new Date(Date.now() + 10 * 3600_000).toISOString(),
+        startsAt: new Date(originalStart.getTime() + 15 * 60_000).toISOString(),
+        endsAt: new Date(originalStart.getTime() + 2 * 3600_000).toISOString(),
         location: { lat: 36.1521, lng: -115.2014 },
       },
     });

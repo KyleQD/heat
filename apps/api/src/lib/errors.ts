@@ -25,5 +25,6 @@ export const routeUnavailable = (m = "No route available for requested modes") =
   new AppError("ROUTE_UNAVAILABLE", m, 422);
 export const locationRequired = (m = "A valid origin location is required") =>
   new AppError("LOCATION_REQUIRED", m, 400);
+export const locationRequiredError = locationRequired;
 export const internalError = (m = "Internal error") =>
   new AppError("INTERNAL_ERROR", m, 500);

@@ -85,16 +85,24 @@ export async function queryViewport(
     ) sv ON TRUE
     WHERE e.visibility_status = 'published'
       AND e.deleted_at IS NULL
+      -- Active-period overlap with [windowStart, windowEnd]; null ends_at
+      -- uses a category-default duration for QUERYING only (never stored).
       AND e.starts_at <= $5
-      AND COALESCE(e.ends_at, e.starts_at + ${DEFAULT_DURATION}) >= $7::timestamptz - ${DEFAULT_DURATION}
+      AND COALESCE(e.ends_at, e.starts_at + ${DEFAULT_DURATION}) >= $7::timestamptz
       AND ST_Intersects(e.location, env.g)
       AND ($8::text IS NULL OR cat.key = $8)
+      -- Starred-only filtering happens BEFORE the density cap so a starred
+      -- user never loses their events to unrelated high-heat rows.
+      AND ($9 = FALSE OR EXISTS (
+        SELECT 1 FROM event_stars s
+        WHERE s.event_id = e.id AND s.user_id = $6 AND s.removed_at IS NULL
+      ))
     ORDER BY
       CASE WHEN e.status = 'canceled' THEN 1 ELSE 0 END,
       COALESCE(e.heat_score, 0) DESC,
       e.stars_count DESC,
       e.starts_at ASC
-    LIMIT $9
+    LIMIT $10
     `,
     [
       p.west,
@@ -105,12 +113,12 @@ export async function queryViewport(
       p.viewerUserId ?? null,
       p.windowStart,
       p.category ?? null,
+      p.starredOnly,
       p.limit,
     ],
   );
 
-  const filtered = p.starredOnly ? rows.filter((r) => r.starred) : rows;
-  return filtered.map((r) => ({
+  return rows.map((r) => ({
     ...r,
     startsAt: new Date(r.startsAt),
     endsAt: r.endsAt ? new Date(r.endsAt) : null,

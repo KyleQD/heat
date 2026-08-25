@@ -18,8 +18,32 @@ const MAX_ENTRIES = 500;
 export class MapResponseCache {
   private store = new Map<string, Entry>();
   private epoch = 0;
+  /** Single-flight: concurrent misses for one key share one computation. */
+  private inflight = new Map<string, Promise<MapEventsResponse>>();
 
   constructor(private readonly clock: () => number = Date.now) {}
+
+  /**
+   * Cache-aside with request coalescing: N concurrent misses on the same key
+   * produce exactly one DB query (stampede protection under burst load).
+   */
+  async getOrLoad(
+    key: string,
+    ttlMs: number,
+    load: () => Promise<MapEventsResponse>,
+  ): Promise<{ body: MapEventsResponse; hit: boolean }> {
+    const cached = this.get(key);
+    if (cached) return { body: cached, hit: true };
+
+    const existing = this.inflight.get(key);
+    if (existing) return { body: await existing, hit: false };
+
+    const flight = load().finally(() => this.inflight.delete(key));
+    this.inflight.set(key, flight);
+    const body = await flight;
+    this.set(key, body, ttlMs);
+    return { body, hit: false };
+  }
 
   /** Quantize coordinates to ~1.1km cells so near-duplicate pan queries hit. */
   private quantize(v: number): number {
