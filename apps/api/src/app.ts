@@ -124,6 +124,12 @@ export async function buildApp(envOverride?: Partial<Env>): Promise<FastifyInsta
       });
     }
     const shaped = err as HttpErrorShape;
+    if (shaped.statusCode === 429 || (err as { name?: string }).name === "RateLimitError") {
+      metrics.inc("http_errors_total", { code: "RATE_LIMITED" });
+      return reply.status(429).send({
+        error: { code: "RATE_LIMITED", message: "Too many requests", requestId: req.id },
+      });
+    }
     if (shaped.statusCode != null && shaped.code != null) {
       return reply.status(shaped.statusCode).send({
         error: { code: shaped.code, message: err.message, requestId: req.id },
