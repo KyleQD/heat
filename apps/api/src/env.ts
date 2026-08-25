@@ -14,6 +14,7 @@ const envSchema = z
     SEATGEEK_API_KEY: z.string().optional(),
     PREDICTHQ_API_KEY: z.string().optional(),
     ROUTING_PROVIDER_KEY: z.string().optional(),
+  ADMIN_TOKEN: z.string().optional(),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   })
   .transform((raw) => {
