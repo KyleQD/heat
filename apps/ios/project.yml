@@ -26,8 +26,8 @@ targets:
     dependencies:
       - package: HeatKit
         product: HeatKit
-      - framework: MapKit.framework
-        implicit: true
+      # System frameworks (MapKit) are auto-linked via imports — do not add
+      # them as file dependencies or xcodegen treats them as vendored binaries.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.heatapp.ios
