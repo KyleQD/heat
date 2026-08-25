@@ -1,5 +1,6 @@
 import MapKit
 import UIKit
+import SwiftUI
 import HeatKit
 
 // MARK: - Annotation models
@@ -172,7 +173,9 @@ final class ClusterMarkerView: MKAnnotationView {
 
     func configure(cluster: ClusterPoint) {
         let color = UIColor(Color.heatColor(score: cluster.maxHeatScore))
-        backgroundConfiguration = UIBackgroundConfiguration.clear()
+        if #available(iOS 16.0, *) {
+            backgroundConfiguration = UIBackgroundConfiguration.clear()
+        }
         backgroundColor = color
         layer.cornerRadius = 17
         bounds = CGRect(x: 0, y: 0, width: 34, height: 34)

@@ -150,7 +150,7 @@ struct CreateEventSheet: View {
                     DatePicker("Ends", selection: $create.draft.endsAt,
                                in: create.draft.startsAt...)
 
-                    for error in create.validationErrors {
+                    ForEach(create.validationErrors, id: \.self) { error in
                         Label(validationCopy(error), systemImage: "exclamationmark.circle")
                             .font(.caption)
                             .foregroundStyle(.red)
