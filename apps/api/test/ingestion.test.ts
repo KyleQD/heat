@@ -111,6 +111,54 @@ describe("Phase D — Ticketmaster normalization", () => {
     expect(normalizeTmEvent(tmEvent({ dates: { start: {}, status: { code: "postponed" } } }) as never, "r4")!.status).toBe("postponed");
   });
 
+  it("HEAT-D010 — ticket URLs must be https on ticketmaster.com", async () => {
+    const { isSafeTicketUrl } = await import("../src/modules/ingestion/ticketmaster.js");
+    expect(isSafeTicketUrl("https://www.ticketmaster.com/x")).toBe(true);
+    expect(isSafeTicketUrl("https://evil.example/tm")).toBe(false);
+    expect(isSafeTicketUrl("http://www.ticketmaster.com/x")).toBe(false);
+    // A hostile URL in the feed is dropped, not propagated.
+    const n = normalizeTmEvent(tmEvent({ url: "https://phish.example/free" }) as never, "r6")!;
+    expect(n.ticketUrl).toBeNull();
+  });
+
+  it("HEAT-D005 — pagination walks pages until short page; retries then gives up on 429", async () => {
+    const mod = await import("../src/modules/ingestion/ticketmaster.js");
+    let calls = 0;
+    const mkPage = (n: number, seed: string) => ({
+      _embedded: {
+        events: Array.from({ length: n }, (_, i) => tmEvent({ id: `${seed}-${i}` })),
+      },
+    });
+    const transport = async () => {
+      calls += 1;
+      if (calls === 1) return mkPage(200, "p0"); // full page → continue
+      if (calls === 2) return mkPage(50, "p1"); // short page → stop
+      throw new Error("should not request a third page");
+    };
+    const result = await mod.fetchTicketmasterEvents(
+      { apiKey: "k", cityKey: "las_vegas_nv" },
+      transport,
+    );
+    expect(calls).toBe(2);
+    expect(result.requestCount).toBe(2);
+    expect(result.events).toHaveLength(250);
+
+    // Quota response: bounded retries then a recorded rate-limit event.
+    let attempts = 0;
+    const limited = async () => {
+      attempts += 1;
+      const e = new Error("429") as Error & { statusCode?: number };
+      e.statusCode = 429;
+      throw e;
+    };
+    const rl = await mod.fetchTicketmasterEvents(
+      { apiKey: "k", cityKey: "las_vegas_nv" },
+      limited,
+    );
+    expect(attempts).toBe(4); // initial + 3 backoff attempts
+    expect(rl.rateLimitEvents).toBe(1);
+  });
+
   it("unknown segment falls back to other", () => {
     expect(normalizeTmEvent(tmEvent({
       classifications: [{ segment: { name: "Miscellaneous" } }],
@@ -151,6 +199,38 @@ describe("Phase D/E — orchestrator with resolution", () => {
 
     const after = await app.inject({ method: "GET", url: "/v1/search?q=TM%20Fixture&limit=20" });
     expect((after.json() as { events: unknown[] }).events.length).toBe(countBefore);
+  });
+
+  it("HEAT-D009 — cancellation propagates to the canonical event on refresh", async () => {
+    // Re-run the SAME external id but now canceled upstream.
+    const canceledRaw = tmEvent({
+      id: concertN!.externalId,
+      dates: {
+        start: { dateTime: new Date(Date.now() + 21 * 3600_000).toISOString() },
+        status: { code: "cancelled" },
+      },
+    });
+    const canceledN = normalizeTmEvent(canceledRaw as never, concertN!.externalId)!;
+    expect(canceledN.status).toBe("canceled");
+
+    const outcome = await orchestrateTicketmasterIngestion(db as never, {
+      fixtures: [{ raw: { fixture: true }, normalized: canceledN }],
+    });
+    expect(outcome.updated).toBeGreaterThanOrEqual(1);
+
+    const { Pool } = await import("pg");
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://heat:heat@localhost:5433/heat" });
+    try {
+      const { rows } = await pool.query<{ status: string }>(
+        `SELECT e.status FROM events e
+         JOIN event_sources s ON s.event_id = e.id
+         WHERE s.provider='ticketmaster' AND s.external_event_id=$1`,
+        [`tm:${concertN!.externalId}`],
+      );
+      expect(rows[0]?.status).toBe("canceled");
+    } finally {
+      await pool.end();
+    }
   });
 
   it("near-identical community event attaches instead of duplicating (auto-match ≥0.90)", async () => {
@@ -199,6 +279,19 @@ describe("Phase D/E — orchestrator with resolution", () => {
 });
 
 describe("Admin surface security", () => {
+  it("HEAT-D012 — fixture ingestion is forbidden in production runtime", async () => {
+    const { orchestrateTicketmasterIngestion } = await import("../src/modules/ingestion/orchestrator.js");
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      await expect(
+        orchestrateTicketmasterIngestion(db as never, { fixtures: [{ raw: {}, normalized: normalizedFrom({}) }] }),
+      ).rejects.toThrow(/FIXTURE_INGESTION_FORBIDDEN/);
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
+  });
+
   it("admin endpoints are 404-absent without ADMIN_TOKEN and 403 without the token", async () => {
     // This suite set ADMIN_TOKEN; a wrong token is FORBIDDEN.
     const wrong = await app.inject({ method: "PUT", url: "/v1/admin/flags", headers: { authorization: "Bearer nope" }, payload: { key: "stars_enabled", enabled: false } });

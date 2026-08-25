@@ -12,6 +12,7 @@
  */
 import crypto from "node:crypto";
 import type { Queryable } from "../../db/pool.js";
+import { metrics } from "../../plugins/metrics.js";
 import { titleSimilarity } from "../../lib/normalize.js";
 import {
   fetchTicketmasterEvents,
@@ -168,6 +169,44 @@ async function createCanonicalFromNormalized(
   return eventId;
 }
 
+/**
+ * HEAT-D009 — refresh path for already-attached sources. Cancellation and
+ * postponement MUST propagate to the canonical event; enrichment fields only
+ * ever fill gaps (never overwrite community content). A canceled canonical
+ * never reverts automatically — that requires human review.
+ */
+async function refreshAttachedSource(
+  client: { query: (...args: unknown[]) => Promise<unknown> },
+  canonicalId: string,
+  n: NormalizedExternalEvent,
+  rawPayload: unknown,
+): Promise<void> {
+  await client.query(
+    `UPDATE event_sources SET
+       raw_payload = $2, last_synced_at = now(), active = TRUE
+     WHERE provider='ticketmaster' AND external_event_id=$1`,
+    [`tm:${n.externalId}`, JSON.stringify(rawPayload)],
+  );
+  await client.query(
+    `UPDATE events SET
+        status = CASE
+          WHEN $2 = 'canceled' THEN 'canceled'
+          WHEN status <> 'canceled' AND $2 = 'postponed' THEN 'postponed'
+          ELSE status
+        END,
+        price_min  = COALESCE(price_min,  $3),
+        price_max  = COALESCE(price_max,  $4),
+        cover_image_url = COALESCE(cover_image_url, $5),
+        updated_at = now()
+      WHERE id = $1`,
+    [
+      canonicalId,
+      n.status === "canceled" || n.status === "postponed" ? n.status : "scheduled",
+      n.priceMin, n.priceMax, n.imageUrl,
+    ],
+  );
+}
+
 async function attachSource(
   client: import("pg").PoolClient,
   n: NormalizedExternalEvent,
@@ -220,6 +259,8 @@ async function recordDecision(
   );
 }
 
+const iso = (d: Date) => d.toISOString();
+
 // ---------------------------------------------------------------------------
 
 export interface FixtureCandidate {
@@ -233,12 +274,19 @@ export interface OrchestrateOptions {
   transport?: (url: string) => Promise<unknown>;
   /** Fixture mode: bypasses transport entirely (tests / replay tooling). */
   fixtures?: FixtureCandidate[];
+  /** HEAT-D007 — tiered schedule window passed through to the provider. */
+  timeWindow?: { start: Date; end: Date };
 }
 
 export async function orchestrateTicketmasterIngestion(
   db: Queryable,
   opts: OrchestrateOptions,
 ): Promise<IngestOutcome> {
+  // HEAT-D012 — the fixture pathway exists ONLY for tests/replay tooling.
+  if (opts.fixtures != null && process.env.NODE_ENV === "production") {
+    throw new Error("FIXTURE_INGESTION_FORBIDDEN");
+  }
+
   const runId = crypto.randomUUID();
   await db.query(
     `INSERT INTO ingestion_runs (id, provider, scope) VALUES ($1,'ticketmaster','las_vegas_nv')`,
@@ -250,7 +298,16 @@ export async function orchestrateTicketmasterIngestion(
 
   if (opts.fixtures == null) {
     const fetched = await fetchTicketmasterEvents(
-      { apiKey: opts.apiKey, cityKey: "las_vegas_nv" },
+      {
+        apiKey: opts.apiKey,
+        cityKey: "las_vegas_nv",
+        ...(opts.timeWindow
+          ? {
+              startDateTime: iso(opts.timeWindow.start),
+              endDateTime: iso(opts.timeWindow.end),
+            }
+          : {}),
+      },
       opts.transport,
     );
     requestCount = fetched.requestCount;
@@ -265,14 +322,32 @@ export async function orchestrateTicketmasterIngestion(
 
   for (const { raw, normalized: n } of candidates) {
     try {
-      // Idempotent by provider identity.
+      // Idempotent by provider identity — but "seen before" never means
+      // "stale forever": HEAT-D009 requires cancellation/postponement and
+      // price drift to propagate on every refresh.
       const existingSource = await db.query<{ event_id: string }>(
         `SELECT s.event_id FROM event_sources s
          WHERE s.provider='ticketmaster' AND s.external_event_id=$1 AND s.active`,
         [`tm:${n.externalId}`],
       );
       if (existingSource.rows[0]) {
-        outcome.updated += 1;
+        if (opts.dryRun) {
+          outcome.updated += 1;
+          continue;
+        }
+        const canonicalId = existingSource.rows[0].event_id;
+        const client = await (db as unknown as { connect: () => Promise<import("pg").PoolClient> }).connect();
+        try {
+          await client.query("BEGIN");
+          await refreshAttachedSource(client, canonicalId, n, raw);
+          await client.query("COMMIT");
+          outcome.updated += 1;
+        } catch (e) {
+          await client.query("ROLLBACK").catch(() => undefined);
+          throw e;
+        } finally {
+          client.release();
+        }
         continue;
       }
 
@@ -343,5 +418,13 @@ export async function orchestrateTicketmasterIngestion(
      outcome.failed === 0 ? "success" : (outcome.created + outcome.attached + outcome.updated > 0 ? "partial" : "failed"),
      outcome.received, outcome.created, outcome.attached, outcome.updated, outcome.failed, requestCount],
   );
+
+  // HEAT-D011 — provider health surfaces in /v1/metrics for dashboards.
+  metrics.inc("provider_runs_total", { provider: "ticketmaster" });
+  if (outcome.created > 0) metrics.inc("provider_records_total", { provider: "ticketmaster", outcome: "created" }, outcome.created);
+  if (outcome.attached > 0) metrics.inc("provider_records_total", { provider: "ticketmaster", outcome: "attached" }, outcome.attached);
+  if (outcome.updated > 0) metrics.inc("provider_records_total", { provider: "ticketmaster", outcome: "updated" }, outcome.updated);
+  if (outcome.failed > 0) metrics.inc("provider_records_total", { provider: "ticketmaster", outcome: "failed" }, outcome.failed);
+
   return outcome;
 }

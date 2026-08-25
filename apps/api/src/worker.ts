@@ -90,23 +90,83 @@ export { executeJob, JOBS };
 
 const HOUR = 3_600_000;
 
+const iso = (d: Date) => d.toISOString();
+
+/** HEAT-D005 — real transport with status-code propagation so the adapter's
+ * retry/backoff can distinguish 429/quota from transient 5xx. */
+const httpTransport = async (url: string): Promise<unknown> => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = new Error(`ticketmaster ${res.status}`) as Error & { statusCode?: number };
+    err.statusCode = res.status;
+    throw err;
+  }
+  return res.json();
+};
+
 const JOBS: JobSpec[] = [
   {
-    name: "provider_refresh",
+    // HEAT-D007 — tier 1: the imminent window (next 72h) is what users see
+    // NOW; it refreshes every 6h so cancellations propagate fast.
+    name: "provider_refresh_imminent",
     intervalMs: 6 * HOUR,
     initialDelayMs: 30_000,
     run: async (db) => {
-      // Runtime-flag gate mirrors the admin ingest endpoint: an explicit
-      // override row wins over the compiled default.
       const flags = await db.query<{ key: string; enabled: boolean }>(
         "SELECT key, enabled FROM feature_flag_overrides WHERE key='ticketmaster_enabled'",
       );
-      const enabled = flags.rows[0]?.enabled === true;
-      if (!enabled) return "skipped";
+      if (flags.rows[0]?.enabled !== true) return "skipped";
       const apiKey = process.env.TICKETMASTER_API_KEY;
       if (!apiKey) return "skipped";
-      const outcome = await orchestrateTicketmasterIngestion(db, { apiKey });
+      const outcome = await orchestrateTicketmasterIngestion(db, {
+        apiKey,
+        transport: httpTransport,
+        timeWindow: { start: new Date(), end: new Date(Date.now() + 72 * HOUR) },
+      });
       return { processed: outcome.received, failed: outcome.failed };
+    },
+  },
+  {
+    // HEAT-D007 — tier 2: the 72h–30d horizon refreshes weekly; supply
+    // discovery for future planning, tolerant of drift.
+    name: "provider_refresh_horizon",
+    intervalMs: 7 * 24 * HOUR,
+    initialDelayMs: 10 * 60_000,
+    run: async (db) => {
+      const flags = await db.query<{ key: string; enabled: boolean }>(
+        "SELECT key, enabled FROM feature_flag_overrides WHERE key='ticketmaster_enabled'",
+      );
+      if (flags.rows[0]?.enabled !== true) return "skipped";
+      const apiKey = process.env.TICKETMASTER_API_KEY;
+      if (!apiKey) return "skipped";
+      const outcome = await orchestrateTicketmasterIngestion(db, {
+        apiKey,
+        transport: httpTransport,
+        timeWindow: { start: new Date(Date.now() + 72 * HOUR), end: new Date(Date.now() + 30 * 24 * HOUR) },
+      });
+      return { processed: outcome.received, failed: outcome.failed };
+    },
+  },
+  {
+    // HEAT-D003 — raw provider payloads are evidence, not product: after 90
+    // days without a re-sync the full JSON collapses to a compact marker.
+    name: "raw_payload_retention",
+    intervalMs: 24 * HOUR,
+    initialDelayMs: 5 * 60_000,
+    run: async (db) => {
+      const { rowCount } = await db.query(
+        `UPDATE event_sources
+         SET raw_payload = jsonb_build_object(
+               'retained_ref', external_event_id,
+               'stripped_at', now(),
+               'note', 'raw payload past 90-day retention'
+             )
+         WHERE provider <> 'native'
+           AND active
+           AND last_synced_at < now() - interval '90 days'
+           AND NOT (raw_payload ? 'stripped_at')`,
+      );
+      return { processed: rowCount ?? 0 };
     },
   },
   {

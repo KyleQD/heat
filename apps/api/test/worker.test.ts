@@ -63,10 +63,11 @@ describe("worker jobs write telemetry rows (C010)", () => {
   });
 
   it("provider_refresh skips cleanly when the flag is off", async () => {
-    const spec = JOBS.find((j) => j.name === "provider_refresh")!;
+    const spec = JOBS.find((j) => j.name === "provider_refresh_imminent")!;
+    expect(spec).toBeTruthy(); // tiered schedule present (D007)
     await executeJob(db as never, spec);
     const { rows } = await db.query<{ status: string }>(
-      `SELECT status FROM job_runs WHERE job_name='provider_refresh'
+      `SELECT status FROM job_runs WHERE job_name='provider_refresh_imminent'
        ORDER BY started_at DESC LIMIT 1`,
     );
     expect(["skipped", "success"]).toContain(rows[0]?.status);
