@@ -53,6 +53,9 @@ jobs:
           CURRENT_PROJECT_VERSION: ${{ github.run_number }}
         run: |
           xcodegen generate
+          # Endpoint injection: production URL comes from repo variables so
+          # rotation never requires a code change.
+          plutil -replace HEAT_API_BASE_URL -string "$HEAT_RELEASE_API_URL" apps/ios/Heat/Info-Release.plist
           xcodebuild archive \
             -project Heat.xcodeproj \
             -scheme Heat \

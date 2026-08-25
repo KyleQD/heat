@@ -14,19 +14,19 @@ iOS app and API. Every policy here maps to a Phase B ticket (handoff v1.1).
 
 ## 2. Build configurations (HEAT-B002)
 
-| Config | Optimization | Bundle ID | Display name | API base URL |
+| Config | Optimization | Bundle ID | Display name | API base URL source |
 |---|---|---|---|---|
-| Debug | debug | `com.heatapp.ios` | HEAT | `http://localhost:8787` (or `HEAT_API_URL` env) |
-| Staging | release | `com.heatapp.ios.staging` | HEAT Staging | `${HEAT_STAGING_API_URL}` at build time |
-| Release | release | `com.heatapp.ios` | HEAT | `${HEAT_RELEASE_API_URL}` at build time |
+| Debug | debug | `com.heatapp.ios` | HEAT | `Heat/Info.plist` (localhost; `HEAT_API_URL` env overrides at runtime) |
+| Staging | release | `com.heatapp.ios.staging` | HEAT Staging | `Heat/Info-Staging.plist` |
+| Release | release | `com.heatapp.ios` | HEAT | `Heat/Info-Release.plist`, overridden pre-archive by `vars.HEAT_RELEASE_API_URL` |
 
-Staging and Release URLs are **build-setting expressions** (`${VAR}`), resolved
-by `xcodebuild` from its environment at compile time:
-
-- unset → empty `HEAT_API_BASE_URL` in Info.plist → non-Debug binaries hit
-  `fatalError` at boot (`AppEnvironment.init`) — no placeholder fallback exists.
-- The CI `ios-archive` job additionally rejects placeholder hosts
-  (`.invalid`, `example`, `unset.`, `localhost`) in archived plists.
+Per-configuration plists (`INFOPLIST_FILE`) are the injection point: each
+carries a real, https `HEAT_API_BASE_URL` — never a placeholder. The release
+workflow rewrites the production value from a repository variable so endpoint
+rotation needs no code change. Defense in depth: any non-Debug binary that
+still ends up without an https non-placeholder URL hits `fatalError` at boot
+(`AppEnvironment.init`), and the CI archive job re-validates the archived
+plist (https scheme, no `.invalid` / `example` / `unset.` / localhost).
 
 ## 3. Signing & identity (HEAT-B004)
 

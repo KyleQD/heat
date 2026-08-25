@@ -104,13 +104,12 @@ jobs:
           grep -q "TEST SUCCEEDED" /tmp/test.log
 
   # B008 — archive validation. A Staging archive must build cleanly and carry
-  # a real injected API URL, staging identity, version/build numbers, the app
-  # icon and the privacy manifest — no signing required for simulator-generic.
+  # its real injected API URL, staging identity, version/build numbers, the
+  # app icon and the privacy manifest — no signing required for simulator.
   ios-archive:
     name: ios-archive
     runs-on: macos-15
     env:
-      HEAT_STAGING_API_URL: https://api.staging.heatapp.dev
       CURRENT_PROJECT_VERSION: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4

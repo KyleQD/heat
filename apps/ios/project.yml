@@ -54,23 +54,21 @@ targets:
         Debug:
           # Local docker-compose stack.
           PRODUCT_BUNDLE_IDENTIFIER: com.heatapp.ios
-          HEAT_API_BASE_URL: http://localhost:8787
+          INFOPLIST_FILE: Heat/Info.plist
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
         Staging:
-          # TestFlight-adjacent internal builds. The URL is REQUIRED at
-          # generation time (export HEAT_STAGING_API_URL=...); an unset value
-          # would fail xcodegen expansion loudly rather than shipping empty.
+          # TestFlight-adjacent internal builds; own identity + endpoint.
+          # Endpoint lives in Heat/Info-Staging.plist and may be overridden by
+          # release CI via plutil before archiving (see release.yml).
           PRODUCT_BUNDLE_IDENTIFIER: com.heatapp.ios.staging
-          INFOPLIST_KEY_CFBundleDisplayName: HEAT Staging
-          HEAT_API_BASE_URL: ${HEAT_STAGING_API_URL}
+          INFOPLIST_FILE: Heat/Info-Staging.plist
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: RELEASE
         Release:
           # App Store / production. Same contract as Staging with the
           # production API. A placeholder that reaches a binary fails fast at
           # boot (see AppEnvironment) and is rejected by archive validation.
           PRODUCT_BUNDLE_IDENTIFIER: com.heatapp.ios
-          INFOPLIST_KEY_CFBundleDisplayName: HEAT
-          HEAT_API_BASE_URL: ${HEAT_RELEASE_API_URL}
+          INFOPLIST_FILE: Heat/Info-Release.plist
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: RELEASE
     info:
       path: Heat/Info.plist
