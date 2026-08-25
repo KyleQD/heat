@@ -7,6 +7,7 @@
  * the epoch; epoch is part of the key so stale entries age out naturally.
  */
 import type { MapEventsResponse } from "@heat/api-contracts";
+import type { SharedCacheClient } from "../../lib/sharedCache.js";
 
 interface Entry {
   body: MapEventsResponse;
@@ -14,6 +15,7 @@ interface Entry {
 }
 
 const MAX_ENTRIES = 500;
+const EPOCH_KEY = "heat:mapcache:epoch";
 
 export class MapResponseCache {
   private store = new Map<string, Entry>();
@@ -21,7 +23,15 @@ export class MapResponseCache {
   /** Single-flight: concurrent misses for one key share one computation. */
   private inflight = new Map<string, Promise<MapEventsResponse>>();
 
-  constructor(private readonly clock: () => number = Date.now) {}
+  /**
+   * HEAT-C003 — pass a SharedCacheClient (Redis) to make invalidation and
+   * payload reuse correct across replicas. Without one the instance behaves
+   * exactly like the original single-process cache.
+   */
+  constructor(
+    private readonly clock: () => number = Date.now,
+    private readonly redis?: SharedCacheClient | null,
+  ) {}
 
   /**
    * Cache-aside with request coalescing: N concurrent misses on the same key
@@ -32,7 +42,7 @@ export class MapResponseCache {
     ttlMs: number,
     load: () => Promise<MapEventsResponse>,
   ): Promise<{ body: MapEventsResponse; hit: boolean }> {
-    const cached = this.get(key);
+    const cached = await this.get(key);
     if (cached) return { body: cached, hit: true };
 
     const existing = this.inflight.get(key);
@@ -41,7 +51,7 @@ export class MapResponseCache {
     const flight = load().finally(() => this.inflight.delete(key));
     this.inflight.set(key, flight);
     const body = await flight;
-    this.set(key, body, ttlMs);
+    await this.set(key, body, ttlMs);
     return { body, hit: false };
   }
 
@@ -69,37 +79,97 @@ export class MapResponseCache {
     ].join("|");
   }
 
-  get(key: string): MapEventsResponse | null {
-    const entry = this.store.get(key);
-    if (!entry) return null;
-    if (this.clock() >= entry.expiresAt) {
-      this.store.delete(key);
-      return null;
+  /**
+   * Adopt the SHARED epoch before any read/write so another replica's
+   * canonical-write bump takes effect immediately (doc 48 / R2-006: a new or
+   * edited event must appear without waiting out a TTL). One small GET per
+   * cache operation — negligible next to the spatial query it guards.
+   */
+  private async adoptSharedEpoch(): Promise<void> {
+    if (!this.redis) return;
+    try {
+      this.epoch = Number((await this.redis.get(EPOCH_KEY)) ?? "0");
+    } catch {
+      /* unreachable bus: keep the locally adopted epoch */
     }
-    // LRU touch.
-    this.store.delete(key);
-    this.store.set(key, entry);
-    return entry.body;
   }
 
-  set(key: string, body: MapEventsResponse, ttlMs: number): void {
+  async get(key: string): Promise<MapEventsResponse | null> {
+    await this.adoptSharedEpoch();
+    const fullKey = `${this.epoch}|${key}`;
+
+    // L1: process-local touch (zero extra cost beyond the epoch probe).
+    const entry = this.store.get(fullKey);
+    if (entry) {
+      if (this.clock() >= entry.expiresAt) {
+        this.store.delete(fullKey);
+      } else {
+        this.store.delete(fullKey);
+        this.store.set(fullKey, entry);
+        return entry.body;
+      }
+    }
+    if (!this.redis) return null;
+
+    // L2: shared payload written by ANY replica.
+    try {
+      const raw = await this.redis.get(`heat:mapcache:v1:${fullKey}`);
+      if (!raw) return null;
+      const body = JSON.parse(raw) as MapEventsResponse;
+      // Re-seed L1; correctness comes from the epoch prefix, not the clock.
+      this.store.set(fullKey, { body, expiresAt: this.clock() + 60_000 });
+      return body;
+    } catch {
+      return null;
+    }
+  }
+
+  async set(key: string, body: MapEventsResponse, ttlMs: number): Promise<void> {
+    await this.adoptSharedEpoch();
+    const fullKey = `${this.epoch}|${key}`;
+
     if (this.store.size >= MAX_ENTRIES) {
       // Drop oldest insertion.
       const oldest = this.store.keys().next().value;
       if (oldest != null) this.store.delete(oldest);
     }
-    this.store.set(key, { body, expiresAt: this.clock() + ttlMs });
+    this.store.set(fullKey, { body, expiresAt: this.clock() + ttlMs });
+
+    if (!this.redis) return;
+    try {
+      await this.redis.set(
+        `heat:mapcache:v1:${fullKey}`,
+        JSON.stringify(body),
+        "PX",
+        ttlMs,
+      );
+    } catch {
+      /* shared-cache write failures degrade to L1 silently */
+    }
   }
 
   /** Called on canonical writes (create/merge/cancel). */
-  invalidateAll(): void {
-    this.epoch += 1;
-    if (this.store.size > MAX_ENTRIES * 2) this.store.clear();
+  async invalidateAll(): Promise<void> {
+    // L1 is dropped outright: every replica must forget pre-bump payloads.
+    this.store.clear();
+    if (this.redis) {
+      try {
+        this.epoch = await this.redis.incr(EPOCH_KEY);
+      } catch {
+        this.epoch += 1;
+      }
+    } else {
+      this.epoch += 1;
+    }
   }
 
   get size(): number {
     return this.store.size;
   }
+}
+
+function ttlForWindowFallback(defaultTtlMs: number): number {
+  return Math.min(defaultTtlMs, 60_000);
 }
 
 /** Active windows churn faster than future windows (doc 48 TTL semantics). */

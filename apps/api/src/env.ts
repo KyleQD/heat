@@ -14,7 +14,11 @@ const envSchema = z
     SEATGEEK_API_KEY: z.string().optional(),
     PREDICTHQ_API_KEY: z.string().optional(),
     ROUTING_PROVIDER_KEY: z.string().optional(),
-  ADMIN_TOKEN: z.string().optional(),
+    ADMIN_TOKEN: z.string().optional(),
+    // HEAT-C003 — optional shared cache; absent = single-node in-memory mode.
+    REDIS_URL: z.string().optional(),
+    // HEAT-C007 — injected by CI into images so /v1/health reports provenance.
+    GIT_SHA: z.string().optional(),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   })
   .transform((raw) => {
@@ -22,6 +26,16 @@ const envSchema = z
     const databaseUrl = raw.DATABASE_URL ?? (raw.NODE_ENV === "production" ? undefined : devDefault);
     if (!databaseUrl) {
       throw new Error("SAFE_CONFIG_ERROR DATABASE_URL: Required");
+    }
+    // HEAT-C011 — production must point at a real managed instance; loopback
+    // hosts are a local-dev convenience and never a valid production target.
+    if (
+      raw.NODE_ENV === "production" &&
+      /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(databaseUrl)
+    ) {
+      throw new Error(
+        "SAFE_CONFIG_ERROR DATABASE_URL: production cannot use a localhost database",
+      );
     }
     return { ...raw, DATABASE_URL: databaseUrl };
   });

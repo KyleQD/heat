@@ -1,56 +1,56 @@
-phase,ticket_id,title,priority,status,owner,notes
-R2,R2-001,Rebuild discovery query composition,P0,done,codex-agent,
-R2,R2-002,Fix personalized Starred cache isolation,P0,done,codex-agent,
-R2,R2-003,Actor-scoped create idempotency,P0,done,codex-agent,
-R2,R2-004,Create payload parity,P1,done,codex-agent,
-R2,R2-005,Create reset/success lifecycle,P1,done,codex-agent,
-R2,R2-006,Explicit discovery invalidation,P1,done,codex-agent,
-R2,R2-007,Star hydration/reconciliation,P1,done,codex-agent,
-R2,R2-008,Current-location creation UI,P1,done,codex-agent,
-R2,R2-009,Unified enhanced route state,P1,done,codex-agent,
-R2,R2-010,Travel-mode-correct handoff,P1,done,codex-agent,
-R2,R2-011,Search lifecycle filtering,P1,done,codex-agent,
-R2,R2-012,PATCH map cache invalidation,P1,done,codex-agent,
-R2,R2-013,Route request correlation,P1,done,codex-agent,
-R2,R2-014,Complete route rate limits,P2,done,codex-agent,
-R2,R2-015,Readiness reporting tied to evidence,P2,done,codex-agent,
-B,HEAT-B001,Deterministic XcodeGen CI,,not_started,,
-B,HEAT-B002,Debug/Staging/Release configurations,,not_started,,
-B,HEAT-B003,Remove release API placeholder,,not_started,,
-B,HEAT-B004,Signing/team/bundle IDs,,not_started,,
-B,HEAT-B005,App icon/resources,,not_started,,
-B,HEAT-B006,Universal link entitlement decision,,not_started,,
-B,HEAT-B007,Real iOS app build/test CI,,not_started,,
-B,HEAT-B008,Archive validation,,not_started,,
-B,HEAT-B009,Strengthen backend CI,,not_started,,
-B,HEAT-B010,Protect main/required checks,,not_started,,
-B,HEAT-B011,Release version strategy,,not_started,,
-B,HEAT-B012,TestFlight pipeline,,not_started,,
-C,HEAT-C001,Managed PostGIS environments,,not_started,,
-C,HEAT-C002,DB roles/least privilege,,not_started,,
-C,HEAT-C003,Redis/shared cache,,not_started,,
-C,HEAT-C004,Runtime feature flags,,not_started,,
-C,HEAT-C005,Secrets management,,not_started,,
-C,HEAT-C006,API deployment pipeline,,not_started,,
-C,HEAT-C007,Health/readiness,,not_started,,
-C,HEAT-C008,Backup/restore drill,,not_started,,
-C,HEAT-C009,Migration release process,,not_started,,
-C,HEAT-C010,Scheduled job runtime,,not_started,,
-C,HEAT-C011,Environment isolation tests,,not_started,,
-C,HEAT-C012,Production runbooks,,not_started,,
-D,HEAT-D001,Provider adapter contract,,not_started,,
-D,HEAT-D002,Fetch-run/raw tables,,not_started,,
-D,HEAT-D003,Raw payload retention policy,,not_started,,
-D,HEAT-D004,Normalized provider candidate types,,not_started,,
-D,HEAT-D005,Pagination/retry/quota behavior,,not_started,,
-D,HEAT-D006,City/time query strategy,,not_started,,
-D,HEAT-D007,Refresh schedule tiers,,not_started,,
-D,HEAT-D008,Source upsert,,not_started,,
-D,HEAT-D009,Cancellation/postponement refresh,,not_started,,
-D,HEAT-D010,Ticket URL validation,,not_started,,
-D,HEAT-D011,Provider health metrics,,not_started,,
-D,HEAT-D012,Disable fixtures in production,,not_started,,
-D,HEAT-D013,Provider replay integration test,,not_started,,
+phase,ticket,title,priority,status,owner,evidence
+R2,R2-001,Rebuild discovery query composition,P0,done,codex-agent,HeatKitCheck R2-001 block (stationary window/category/starred compose; key covers filters) | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-002,Fix personalized Starred cache isolation,P0,done,codex-agent,apps/api/test/remediation2.test.ts 'personalized cache isolation' (A/B/anonymous) | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-003,Actor-scoped create idempotency,P0,done,codex-agent,migration 0018 + remediation2.test.ts actor-scope cases + HeatKitCheck attempt-key lifecycle | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-004,Create payload parity,P1,done,codex-agent,remediation2.test.ts description persistence | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-005,Create reset/success lifecycle,P1,done,codex-agent,CreateStore.resetDraft lifecycle; sheet closes on .published (HeatMapScreen binding) | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-006,Explicit discovery invalidation,P1,done,codex-agent,DiscoveryStore.invalidateAndRefresh called on create success | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-007,Star hydration/reconciliation,P1,done,codex-agent,hydrateFromServer at boot + reconcile(false) removals + batch reconcile from map | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-008,Current-location creation UI,P1,done,codex-agent,CreateLocationBar Use My Location with denied/locating hints | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-009,Unified enhanced route state,P1,done,codex-agent,RouteStore.displayOption unified; map polyline + panel consume it; MKDirections provider injected | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-010,Travel-mode-correct handoff,P1,done,codex-agent,NavigationHandoffURLs mode-correct params; Bike disabled for V1 GO | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-011,Search lifecycle filtering,P1,done,codex-agent,searchRepository lifecycle WHERE clause + remediation2 test | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-012,PATCH map cache invalidation,P1,done,codex-agent,events.routes PATCH invalidates mapCache | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-013,Route request correlation,P1,done,codex-agent,routing.routes correlated UPDATE ... AND event_id + regression | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-014,Complete route rate limits,P2,done,codex-agent,limits.ts duplicateProbe/starredList/starMetrics/cities presets applied | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+R2,R2-015,Readiness reporting tied to evidence,P2,done,codex-agent,docs/LAUNCH_READINESS.md rewritten around executable gates | CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active
+B,HEAT-B001,Deterministic XcodeGen CI,,done,codex-agent,Policy: project.yml is source of truth; .xcodeproj gitignored | Every iOS CI job runs xcodegen generate | docs/RELEASE_ENGINEERING.md §1 | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+B,HEAT-B002,Debug/Staging/Release configurations,,done,codex-agent,project.yml configs Debug/Staging/Release with per-config bundle id + display name | Heat/Info-Staging.plist + Info-Release.plist carry per-env API URLs | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+B,HEAT-B003,Remove release API placeholder,,done,codex-agent,api.heat.example fallback removed from HeatApp.swift | non-Debug binaries require https non-placeholder URL or fatalError at boot | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+B,HEAT-B004,Signing/team/bundle IDs,,done,codex-agent,DEVELOPMENT_TEAM injected via ${HEAT_DEVELOPMENT_TEAM}; empty for unsigned CI | No certs in repo; TestFlight secret model documented (§3) | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+B,HEAT-B005,App icon/resources,,done,codex-agent,AppIcon.appiconset with 1024px icon committed | AccentColor.colorset added; ASSETCATALOG_COMPILER names wired | Archive validation asserts icon compiled into bundle | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+B,HEAT-B006,Universal link entitlement decision,,done,codex-agent,Decision: beta ships heat:// custom scheme only; Associated Domains deferred to Phase J | Documented with consequences in docs/RELEASE_ENGINEERING.md §4 | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+B,HEAT-B007,Real iOS app build/test CI,,done,codex-agent,ci.yml ios-app: xcodegen + xcodebuild build/test of real Heat target on macos-15 | XCTest failures gate the job (no warning-swallowing) | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+B,HEAT-B008,Archive validation,,done,codex-agent,"ios-archive job archives Staging against generic simulator destination | Validates https non-placeholder API URL, staging identity, versions, MinOS 17, icon, privacy manifest | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+B,HEAT-B009,Strengthen backend CI,,done,codex-agent,Backend CI: workspace typecheck + npm audit --omit=dev high+ (0 vulns after fastify 5) | migrations on clean PostGIS + seed + unit/integration/query-plan tests | Migration rollback smoke (down one + re-up) gates merge | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+B,HEAT-B010,Protect main/required checks,,done,codex-agent,"Branch protection live on main: required contexts api/ios-core/ios-app/ios-archive | strict up-to-date, admin-enforced, linear history, no force-push, conversation resolution | Solo-maintainer review exception documented (§8) | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+B,HEAT-B011,Release version strategy,,done,codex-agent,MARKETING_VERSION 0.2.0 single-sourced; CURRENT_PROJECT_VERSION = github.run_number in archives | Tag scheme ios-v*/api-v* documented (§5); archive validation enforces positive build number | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+B,HEAT-B012,TestFlight pipeline,,done,codex-agent,release.yml: tag-gated (ios-v*) archive/export/upload pipeline via App Store Connect API key | Fails loudly listing missing secrets; flow + secret table documented (§7) | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+C,HEAT-C001,Managed PostGIS environments,,partial,codex-agent,Requirements + acceptance checklist in docs/runbooks/provision-environment.md | NOTE: managed instance provisioning itself is an external ops step (needs cloud account) | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+C,HEAT-C002,DB roles/least privilege,,done,codex-agent,Migration 0022 creates heat_migrator/heat_api/heat_worker/heat_readonly with least privilege | Default privileges set; deploy pipeline warns when DEPLOY_DATABASE_URL is not migrator-scoped | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+C,HEAT-C003,Redis/shared cache,,done,codex-agent,MapResponseCache optional Redis layer: shared epoch adopted on every read/write → cross-replica invalidation immediate | Multi-replica contract tests in envIsolation.test.ts; redis:7 in compose; REDIS_URL optional env | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+C,HEAT-C004,Runtime feature flags,,done,codex-agent,feature_flag_overrides table + effectiveFlags merge served by /v1/config | Admin PUT /v1/admin/flags token-gated; worker jobs honor overrides | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+C,HEAT-C005,Secrets management,,done,codex-agent,All secrets env-only; none in repo/iOS bundle (verified by grep + design) | Separate namespaces + rotation procedure in rotate-provider-key.md | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+C,HEAT-C006,API deployment pipeline,,done,codex-agent,deploy-api.yml: immutable GHCR image → migrator-identity migrations → rolling deploy → readiness smoke gates traffic | Missing secrets fail loudly with runbook pointer | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+C,HEAT-C007,Health/readiness,,done,codex-agent,"/v1/ready reports database/cache/worker freshness with degradation policy; /v1/health carries GIT_SHA version | Smoke-tested live: database ok, cache ok (redis://localhost:6380) | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+C,HEAT-C008,Backup/restore drill,,done,codex-agent,"scripts/db-backup.sh (custom format + sha256) and db-restore-verify.sh (scratch restore + verification queries) | REAL drill executed 2026-08-25: 219 events/18 venues/137 users restored, spatial+referential clean; logged in restore-db.md | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+C,HEAT-C009,Migration release process,,done,codex-agent,"Migrations applied by CI/deploy pipeline from the serving image, never at API boot | Rollback smoke in backend CI; every migration documents its rollback statement | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+C,HEAT-C010,Scheduled job runtime,,done,codex-agent,"worker.ts runtime: provider_refresh tiers, stale_source_sweep, raw retention, session_cleanup | Every run writes job_runs row (status/window/processed/failed/error_summary); worker.test.ts locks contract | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+C,HEAT-C011,Environment isolation tests,,done,codex-agent,envIsolation.test.ts: production rejects missing AND loopback DATABASE_URL; dev fallback confined to non-prod | Provider creds are env-scoped per namespace by policy (rotate-provider-key.md) | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+C,HEAT-C012,Production runbooks,,done,codex-agent,"docs/runbooks/: deploy-api, rollback-api, restore-db, rotate-provider-key, provider-outage, disable-community-creation, disable-routing (+ provision-environment) | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+D,HEAT-D001,Provider adapter contract,,done,codex-agent,ticketmaster.ts adapter: NormalizedExternalEvent contract; provider payloads never canonical directly nor reach mobile | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+D,HEAT-D002,Fetch-run/raw tables,,done,codex-agent,ingestion_runs telemetry (0020) + raw payloads stored on event_sources rows | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+D,HEAT-D003,Raw payload retention policy,,done,codex-agent,raw_payload_retention daily job collapses >90d inactive provider payloads to compact markers | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+D,HEAT-D004,Normalized provider candidate types,,done,codex-agent,NormalizedExternalEvent type covers precision/status/pricing/venue geo; uncertainty preserved (no invented times) | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+D,HEAT-D005,Pagination/retry/quota behavior,,done,codex-agent,"Pagination walks full pages until short page, 5-page quota ceiling | 429/5xx bounded exponential backoff then recorded rate-limit event — regression tested | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+D,HEAT-D006,City/time query strategy,,done,codex-agent,"Discovery queries city-scoped, date-sorted, optional start/end windows for tiered refresh | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+D,HEAT-D007,Refresh schedule tiers,,done,codex-agent,"Worker two-tier schedule: imminent 0–72h @6h, horizon 72h–30d weekly | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+D,HEAT-D008,Source upsert,,done,codex-agent,"event_sources upsert ON CONFLICT (provider, external_event_id) with enrichment COALESCE | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+D,HEAT-D009,Cancellation/postponement refresh,,done,codex-agent,Refresh path propagates canceled/postponed to canonicals (never auto-un-cancels); regression-tested end-to-end | stale_source_sweep deactivates sources silent >7 days | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+D,HEAT-D010,Ticket URL validation,,done,codex-agent,Ticket URLs restricted to https on *.ticketmaster.com; hostile feed URLs dropped at normalization | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+D,HEAT-D011,Provider health metrics,,done,codex-agent,provider_runs_total / provider_records_total counters exposed via /v1/metrics | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+D,HEAT-D012,Disable fixtures in production,,done,codex-agent,Fixture ingestion throws FIXTURE_INGESTION_FORBIDDEN under NODE_ENV=production | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
+D,HEAT-D013,Provider replay integration test,,done,codex-agent,Fixture replay harness: ingestion.test.ts drives orchestrator through create/idempotent-refresh/cancel-propagate/auto-attach scenarios offline | CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main
 E,HEAT-E001,Normalization helpers,,not_started,,
 E,HEAT-E002,Venue resolver,,not_started,,
 E,HEAT-E003,Event candidate search,,not_started,,

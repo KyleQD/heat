@@ -16,5 +16,19 @@ services:
       timeout: 3s
       retries: 20
 
+  # HEAT-C003 — shared cache for multi-replica correctness. Local stack runs
+  # one API, but the port mirrors staging so REDIS_URL habits transfer.
+  redis:
+    image: redis:7-alpine
+    container_name: heat-redis
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
 volumes:
   heat_pgdata:

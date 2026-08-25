@@ -121,7 +121,7 @@ export function normalizeTmEvent(raw: TmEvent, rawRef: string): NormalizedExtern
     venueTmId: venue?.id ?? null,
     venueName: venue?.name ?? null,
     category: mapCategory(raw),
-    ticketUrl: raw.url ?? null,
+    ticketUrl: isSafeTicketUrl(raw.url) ? raw.url! : null,
     priceMin: price?.min ?? null,
     priceMax: price?.max ?? null,
     currency: price?.currency ?? null,
@@ -141,25 +141,104 @@ export interface TmFetchResult {
   rateLimitEvents: number;
 }
 
+const PAGE_SIZE = 200;
+const MAX_PAGES = 5; // quota ceiling per run (doc D005): 1000 events/run
+const RETRY_DELAYS_MS = [250, 1_000, 4_000];
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** HEAT-D010 — only https ticket links from the provider's own domains pass
+ * normalization into canonical_ticket_url. */
+export function isSafeTicketUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === "https:" &&
+      /(^|\.)ticketmaster\.com$/.test(parsed.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function fetchPage(
+  url: string,
+  transport: (url: string) => Promise<unknown>,
+): Promise<{ payload: { _embedded?: { events?: TmEvent[] } } | null; retryAfterMs: number | null }> {
+  let lastStatus: number | null = null;
+  let retryAfterMs: number | null = null;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const payload = (await transport(url)) as {
+        _embedded?: { events?: TmEvent[] };
+      };
+      return { payload, retryAfterMs: null };
+    } catch (e) {
+      const err = e as { statusCode?: number; responseStatusCode?: number };
+      lastStatus = err.statusCode ?? err.responseStatusCode ?? null;
+      // 429/quota or 5xx → bounded exponential backoff with Retry-After honor.
+      if ((lastStatus === 429 || (lastStatus != null && lastStatus >= 500)) && attempt < RETRY_DELAYS_MS.length) {
+        retryAfterMs = RETRY_DELAYS_MS[attempt]!;
+        await sleep(retryAfterMs);
+        continue;
+      }
+      throw e;
+    }
+  }
+  return { payload: null, retryAfterMs }; // unreachable; satisfies types
+}
+
 export async function fetchTicketmasterEvents(
-  opts: { apiKey: string | undefined; cityKey: string; page?: number },
+  opts: {
+    apiKey: string | undefined;
+    cityKey: string;
+    page?: number;
+    /** HEAT-D006/D007 — optional start/end window (ISO 8601) for tiered
+     * schedules: imminent windows refresh often, horizons rarely. */
+    startDateTime?: string;
+    endDateTime?: string;
+  },
   transport?: (url: string) => Promise<unknown>,
 ): Promise<TmFetchResult> {
   if (!opts.apiKey || !transport) {
     return { events: [], requestCount: 0, rateLimitEvents: 0 };
   }
-  const url =
+
+  // HEAT-D006 — query strategy: city-scoped, ordered by soonest start so the
+  // first pages cover the live window consumers actually browse.
+  const base =
     `https://app.ticketmaster.com/discovery/v2/events.json` +
-    `?city=${encodeURIComponent("Las Vegas")}&countryCode=US&size=200&page=${opts.page ?? 0}` +
-    `&apikey=${opts.apiKey}`;
-  const payload = (await transport(url)) as { _embedded?: { events?: TmEvent[] } };
-  const raws = payload._embedded?.events ?? [];
-  return {
-    events: raws.map((raw) => ({
+    `?city=${encodeURIComponent("Las Vegas")}&countryCode=US` +
+    `&sort=date,asc&apikey=${opts.apiKey}` +
+    (opts.startDateTime ? `&startDateTime=${encodeURIComponent(opts.startDateTime)}` : "") +
+    (opts.endDateTime ? `&endDateTime=${encodeURIComponent(opts.endDateTime)}` : "");
+
+  const events: Array<{ raw: unknown; normalized: NormalizedExternalEvent | null }> = [];
+  let requestCount = 0;
+  let rateLimitEvents = 0;
+
+  const firstPage = opts.page ?? 0;
+  for (let page = firstPage; page < firstPage + MAX_PAGES; page += 1) {
+    const url = `${base}&size=${PAGE_SIZE}&page=${page}`;
+    requestCount += 1;
+    let payload: { _embedded?: { events?: TmEvent[] } } | null;
+    try {
+      ({ payload } = await fetchPage(url, transport));
+    } catch {
+      rateLimitEvents += 1;
+      break; // give up this run; telemetry records the shortfall
+    }
+    if (!payload) break;
+
+    const raws = payload._embedded?.events ?? [];
+    events.push(...raws.map((raw) => ({
       raw,
       normalized: normalizeTmEvent(raw, `tm:${raw.id}`),
-    })),
-    requestCount: 1,
-    rateLimitEvents: 0,
-  };
+    })));
+
+    if (raws.length < PAGE_SIZE) break; // last page
+  }
+
+  return { events, requestCount, rateLimitEvents };
 }

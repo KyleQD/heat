@@ -203,98 +203,150 @@
         {
           "id": "HEAT-B001",
           "title": "Deterministic XcodeGen CI",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Policy: project.yml is source of truth; .xcodeproj gitignored",
+            "Every iOS CI job runs xcodegen generate",
+            "docs/RELEASE_ENGINEERING.md §1",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B002",
           "title": "Debug/Staging/Release configurations",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "project.yml configs Debug/Staging/Release with per-config bundle id + display name",
+            "Heat/Info-Staging.plist + Info-Release.plist carry per-env API URLs",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B003",
           "title": "Remove release API placeholder",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "api.heat.example fallback removed from HeatApp.swift",
+            "non-Debug binaries require https non-placeholder URL or fatalError at boot",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B004",
           "title": "Signing/team/bundle IDs",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "DEVELOPMENT_TEAM injected via ${HEAT_DEVELOPMENT_TEAM}; empty for unsigned CI",
+            "No certs in repo; TestFlight secret model documented (§3)",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B005",
           "title": "App icon/resources",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "AppIcon.appiconset with 1024px icon committed",
+            "AccentColor.colorset added; ASSETCATALOG_COMPILER names wired",
+            "Archive validation asserts icon compiled into bundle",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B006",
           "title": "Universal link entitlement decision",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Decision: beta ships heat:// custom scheme only; Associated Domains deferred to Phase J",
+            "Documented with consequences in docs/RELEASE_ENGINEERING.md §4",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B007",
           "title": "Real iOS app build/test CI",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "ci.yml ios-app: xcodegen + xcodebuild build/test of real Heat target on macos-15",
+            "XCTest failures gate the job (no warning-swallowing)",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B008",
           "title": "Archive validation",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "ios-archive job archives Staging against generic simulator destination",
+            "Validates https non-placeholder API URL, staging identity, versions, MinOS 17, icon, privacy manifest",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B009",
           "title": "Strengthen backend CI",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Backend CI: workspace typecheck + npm audit --omit=dev high+ (0 vulns after fastify 5)",
+            "migrations on clean PostGIS + seed + unit/integration/query-plan tests",
+            "Migration rollback smoke (down one + re-up) gates merge",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B010",
           "title": "Protect main/required checks",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Branch protection live on main: required contexts api/ios-core/ios-app/ios-archive",
+            "strict up-to-date, admin-enforced, linear history, no force-push, conversation resolution",
+            "Solo-maintainer review exception documented (§8)",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B011",
           "title": "Release version strategy",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "MARKETING_VERSION 0.2.0 single-sourced; CURRENT_PROJECT_VERSION = github.run_number in archives",
+            "Tag scheme ios-v*/api-v* documented (§5); archive validation enforces positive build number",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-B012",
           "title": "TestFlight pipeline",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "release.yml: tag-gated (ios-v*) archive/export/upload pipeline via App Store Connect API key",
+            "Fails loudly listing missing secrets; flow + secret table documented (§7)",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         }
       ]
     },
@@ -304,98 +356,145 @@
         {
           "id": "HEAT-C001",
           "title": "Managed PostGIS environments",
-          "status": "not_started",
-          "owner": null,
+          "status": "partial",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Requirements + acceptance checklist in docs/runbooks/provision-environment.md",
+            "NOTE: managed instance provisioning itself is an external ops step (needs cloud account)",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C002",
           "title": "DB roles/least privilege",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Migration 0022 creates heat_migrator/heat_api/heat_worker/heat_readonly with least privilege",
+            "Default privileges set; deploy pipeline warns when DEPLOY_DATABASE_URL is not migrator-scoped",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C003",
           "title": "Redis/shared cache",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "MapResponseCache optional Redis layer: shared epoch adopted on every read/write → cross-replica invalidation immediate",
+            "Multi-replica contract tests in envIsolation.test.ts; redis:7 in compose; REDIS_URL optional env",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C004",
           "title": "Runtime feature flags",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "feature_flag_overrides table + effectiveFlags merge served by /v1/config",
+            "Admin PUT /v1/admin/flags token-gated; worker jobs honor overrides",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C005",
           "title": "Secrets management",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "All secrets env-only; none in repo/iOS bundle (verified by grep + design)",
+            "Separate namespaces + rotation procedure in rotate-provider-key.md",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C006",
           "title": "API deployment pipeline",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "deploy-api.yml: immutable GHCR image → migrator-identity migrations → rolling deploy → readiness smoke gates traffic",
+            "Missing secrets fail loudly with runbook pointer",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C007",
           "title": "Health/readiness",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "/v1/ready reports database/cache/worker freshness with degradation policy; /v1/health carries GIT_SHA version",
+            "Smoke-tested live: database ok, cache ok (redis://localhost:6380)",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C008",
           "title": "Backup/restore drill",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "scripts/db-backup.sh (custom format + sha256) and db-restore-verify.sh (scratch restore + verification queries)",
+            "REAL drill executed 2026-08-25: 219 events/18 venues/137 users restored, spatial+referential clean; logged in restore-db.md",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C009",
           "title": "Migration release process",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Migrations applied by CI/deploy pipeline from the serving image, never at API boot",
+            "Rollback smoke in backend CI; every migration documents its rollback statement",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C010",
           "title": "Scheduled job runtime",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "worker.ts runtime: provider_refresh tiers, stale_source_sweep, raw retention, session_cleanup",
+            "Every run writes job_runs row (status/window/processed/failed/error_summary); worker.test.ts locks contract",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C011",
           "title": "Environment isolation tests",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "envIsolation.test.ts: production rejects missing AND loopback DATABASE_URL; dev fallback confined to non-prod",
+            "Provider creds are env-scoped per namespace by policy (rotate-provider-key.md)",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-C012",
           "title": "Production runbooks",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "docs/runbooks/: deploy-api, rollback-api, restore-db, rotate-provider-key, provider-outage, disable-community-creation, disable-routing (+ provision-environment)",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         }
       ]
     },
@@ -405,106 +504,147 @@
         {
           "id": "HEAT-D001",
           "title": "Provider adapter contract",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "ticketmaster.ts adapter: NormalizedExternalEvent contract; provider payloads never canonical directly nor reach mobile",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D002",
           "title": "Fetch-run/raw tables",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "ingestion_runs telemetry (0020) + raw payloads stored on event_sources rows",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D003",
           "title": "Raw payload retention policy",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "raw_payload_retention daily job collapses >90d inactive provider payloads to compact markers",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D004",
           "title": "Normalized provider candidate types",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "NormalizedExternalEvent type covers precision/status/pricing/venue geo; uncertainty preserved (no invented times)",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D005",
           "title": "Pagination/retry/quota behavior",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Pagination walks full pages until short page, 5-page quota ceiling",
+            "429/5xx bounded exponential backoff then recorded rate-limit event — regression tested",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D006",
           "title": "City/time query strategy",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Discovery queries city-scoped, date-sorted, optional start/end windows for tiered refresh",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D007",
           "title": "Refresh schedule tiers",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Worker two-tier schedule: imminent 0–72h @6h, horizon 72h–30d weekly",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D008",
           "title": "Source upsert",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "event_sources upsert ON CONFLICT (provider, external_event_id) with enrichment COALESCE",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D009",
           "title": "Cancellation/postponement refresh",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Refresh path propagates canceled/postponed to canonicals (never auto-un-cancels); regression-tested end-to-end",
+            "stale_source_sweep deactivates sources silent >7 days",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D010",
           "title": "Ticket URL validation",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Ticket URLs restricted to https on *.ticketmaster.com; hostile feed URLs dropped at normalization",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D011",
           "title": "Provider health metrics",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "provider_runs_total / provider_records_total counters exposed via /v1/metrics",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D012",
           "title": "Disable fixtures in production",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Fixture ingestion throws FIXTURE_INGESTION_FORBIDDEN under NODE_ENV=production",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         },
         {
           "id": "HEAT-D013",
           "title": "Provider replay integration test",
-          "status": "not_started",
-          "owner": null,
+          "status": "done",
+          "owner": "codex-agent",
           "notes": "",
-          "evidence": []
+          "evidence": [
+            "Fixture replay harness: ingestion.test.ts drives orchestrator through create/idempotent-refresh/cancel-propagate/auto-attach scenarios offline",
+            "CI run (phase-b-ci-release PR #1): api/ios-core/ios-app/ios-archive all green on protected main"
+          ]
         }
       ]
     },

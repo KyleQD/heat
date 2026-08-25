@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node --import tsx src/server.ts",
+    "start:worker": "node --import tsx src/worker.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "migrate": "tsx src/db/migrateCli.ts up",
@@ -18,6 +19,7 @@
     "@heat/config": "*",
     "@heat/domain": "*",
     "fastify": "^5.12.1",
+    "ioredis": "^5.11.1",
     "pg": "^8.13.1",
     "zod": "^3.23.8"
   },

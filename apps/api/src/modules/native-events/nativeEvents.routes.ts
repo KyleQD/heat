@@ -135,7 +135,7 @@ export function registerNativeEventRoutes(app: FastifyInstance, db: PgPoolLike):
         idempotencyKey,
         requestHash,
       );
-      app.mapCache.invalidateAll();
+      await app.mapCache.invalidateAll();
       await recalculateEventHeat(db, result.eventId).catch(() => undefined);
       reply.code(result.reusedIdempotencyKey ? 200 : 201);
       return {
