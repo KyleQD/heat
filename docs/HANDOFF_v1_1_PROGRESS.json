@@ -23,7 +23,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "HeatKitCheck R2-001 block (stationary window/category/starred compose; key covers filters)"
+            "HeatKitCheck R2-001 block (stationary window/category/starred compose; key covers filters)",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -34,7 +35,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "apps/api/test/remediation2.test.ts 'personalized cache isolation' (A/B/anonymous)"
+            "apps/api/test/remediation2.test.ts 'personalized cache isolation' (A/B/anonymous)",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -45,7 +47,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "migration 0018 + remediation2.test.ts actor-scope cases + HeatKitCheck attempt-key lifecycle"
+            "migration 0018 + remediation2.test.ts actor-scope cases + HeatKitCheck attempt-key lifecycle",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -56,7 +59,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "remediation2.test.ts description persistence"
+            "remediation2.test.ts description persistence",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -67,7 +71,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "CreateStore.resetDraft lifecycle; sheet closes on .published (HeatMapScreen binding)"
+            "CreateStore.resetDraft lifecycle; sheet closes on .published (HeatMapScreen binding)",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -78,7 +83,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "DiscoveryStore.invalidateAndRefresh called on create success"
+            "DiscoveryStore.invalidateAndRefresh called on create success",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -89,7 +95,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "hydrateFromServer at boot + reconcile(false) removals + batch reconcile from map"
+            "hydrateFromServer at boot + reconcile(false) removals + batch reconcile from map",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -100,7 +107,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "CreateLocationBar Use My Location with denied/locating hints"
+            "CreateLocationBar Use My Location with denied/locating hints",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -111,7 +119,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "RouteStore.displayOption unified; map polyline + panel consume it; MKDirections provider injected"
+            "RouteStore.displayOption unified; map polyline + panel consume it; MKDirections provider injected",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -122,7 +131,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "NavigationHandoffURLs mode-correct params; Bike disabled for V1 GO"
+            "NavigationHandoffURLs mode-correct params; Bike disabled for V1 GO",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -133,7 +143,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "searchRepository lifecycle WHERE clause + remediation2 test"
+            "searchRepository lifecycle WHERE clause + remediation2 test",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -144,7 +155,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "events.routes PATCH invalidates mapCache"
+            "events.routes PATCH invalidates mapCache",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -155,7 +167,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "routing.routes correlated UPDATE ... AND event_id + regression"
+            "routing.routes correlated UPDATE ... AND event_id + regression",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -166,7 +179,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "limits.ts duplicateProbe/starredList/starMetrics/cities presets applied"
+            "limits.ts duplicateProbe/starredList/starMetrics/cities presets applied",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         },
         {
@@ -177,7 +191,8 @@
           "owner": "codex-agent",
           "notes": "",
           "evidence": [
-            "docs/LAUNCH_READINESS.md rewritten around executable gates"
+            "docs/LAUNCH_READINESS.md rewritten around executable gates",
+            "CI run 32811932919 all jobs success (api/ios-core/ios-app); branch protection active"
           ]
         }
       ]
