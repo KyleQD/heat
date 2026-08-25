@@ -1,0 +1,84 @@
+name: release-ios
+
+# B012 — TestFlight pipeline. Runs ONLY on ios-v* tags. Fails loudly when the
+# App Store Connect secrets are not configured; never uploads unsigned or
+# placeholder-configured builds. See docs/RELEASE_ENGINEERING.md §7.
+
+on:
+  push:
+    tags:
+      - "ios-v*"
+
+jobs:
+  testflight:
+    name: TestFlight upload
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight — secrets configured?
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          P8: ${{ secrets.APPSTORE_KEY_P8 }}
+          TEAM: ${{ secrets.HEAT_DEVELOPMENT_TEAM }}
+          API_URL: ${{ vars.HEAT_RELEASE_API_URL }}
+        run: |
+          missing=0
+          for v in KEY_ID ISSUER_ID P8 TEAM API_URL; do
+            if [ -z "${!v}" ]; then echo "::error::Secret/var '$v' not configured — TestFlight upload cannot proceed. See docs/RELEASE_ENGINEERING.md §7."; missing=1; fi
+          done
+          exit $missing
+
+      - name: Install App Store Connect key
+        env:
+          P8: ${{ secrets.APPSTORE_KEY_P8 }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$P8" > ~/private_keys/AuthKey_${{ secrets.APPSTORE_KEY_ID }}.p8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate + archive Release
+        working-directory: apps/ios
+        env:
+          HEAT_DEVELOPMENT_TEAM: ${{ secrets.HEAT_DEVELOPMENT_TEAM }}
+          HEAT_RELEASE_API_URL: ${{ vars.HEAT_RELEASE_API_URL }}
+          CURRENT_PROJECT_VERSION: ${{ github.run_number }}
+        run: |
+          xcodegen generate
+          xcodebuild archive \
+            -project Heat.xcodeproj \
+            -scheme Heat \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath /tmp/Heat.xcarchive
+
+      - name: Export TestFlight ipa
+        run: |
+          cat > /tmp/exportTestFlight.plist <<'PL'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          PL
+          xcodebuild -exportArchive \
+            -archivePath /tmp/Heat.xcarchive \
+            -exportOptionsPlist /tmp/exportTestFlight.plist \
+            -exportPath /tmp/ipa
+
+      - name: Upload to TestFlight
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+        run: |
+          xcrun altool --upload-app -f /tmp/ipa/*.ipa \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID" --type ios
