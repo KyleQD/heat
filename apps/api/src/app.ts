@@ -13,6 +13,7 @@ import { getPool, closePool } from "./db/pool.js";
 import { resolveUser } from "./plugins/auth.js";
 import { metrics } from "./plugins/metrics.js";
 import { MapResponseCache } from "./modules/map/mapCache.js";
+import { connectSharedCache, type SharedCacheClient } from "./lib/sharedCache.js";
 import { HeatRecalculator } from "./modules/heat/engine.js";
 import { AppError } from "./lib/errors.js";
 import { registerSystemRoutes } from "./modules/system/system.routes.js";
@@ -32,11 +33,13 @@ declare module "fastify" {
   interface FastifyInstance {
     heat: HeatRecalculator;
     mapCache: MapResponseCache;
+    sharedCache: SharedCacheClient | null;
+    gitSha: string;
   }
 }
 
 /** Routes that never need session resolution. */
-const PUBLIC_PATH_PREFIXES = ["/v1/health", "/v1/config", "/v1/metrics"];
+const PUBLIC_PATH_PREFIXES = ["/v1/health", "/v1/ready", "/v1/config", "/v1/metrics"];
 
 export async function buildApp(envOverride?: Partial<Env>): Promise<FastifyInstance> {
   const env = { ...loadEnv(), ...envOverride };
@@ -70,13 +73,20 @@ export async function buildApp(envOverride?: Partial<Env>): Promise<FastifyInsta
     });
   });
 
-  const mapCache = new MapResponseCache();
+  // HEAT-C003 — shared cache across replicas when REDIS_URL is configured;
+  // single-node deployments keep the pure in-memory behavior.
+  const sharedCache = await connectSharedCache(env.REDIS_URL, {
+    warn: (m) => app.log.warn(m),
+  });
+  const mapCache = new MapResponseCache(Date.now, sharedCache);
   const heat = new HeatRecalculator(() => db);
   // Doc 48 invalidation trigger: HEAT changes above threshold bust the epoch.
-  heat.onMaterialChange = () => mapCache.invalidateAll();
+  heat.onMaterialChange = () => void mapCache.invalidateAll();
   heat.start();
   app.decorate("heat", heat);
   app.decorate("mapCache", mapCache);
+  app.decorate("sharedCache", sharedCache);
+  app.decorate("gitSha", process.env.GIT_SHA ?? "dev");
 
   metrics.registerGauge("heat_map_cache_entries", () => mapCache.size);
   metrics.registerGauge("heat_recalc_dirty_events", () => heat.dirtyCount);

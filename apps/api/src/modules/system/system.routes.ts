@@ -25,12 +25,61 @@ const INTERACTION_MAP: Record<string, string> = {
 };
 
 export function registerSystemRoutes(app: FastifyInstance, db: PgPoolLike): void {
+  // Liveness — cheap, dependency-light. Deploy orchestrators use this to
+  // decide restarts; readiness is a separate, richer contract below.
   app.get("/v1/health", async () => {
-    const { rows } = await db.query<{ ok: boolean }>("SELECT TRUE AS ok");
     return {
-      status: rows[0]?.ok === true ? "ok" : "degraded",
+      status: "ok",
+      version: app.gitSha,
       time: new Date().toISOString(),
     };
+  });
+
+  // HEAT-C007 — readiness: DB connectivity + shared-cache reachability +
+  // worker freshness (degradation policy: a stale worker DEGRADES but does
+  // not fail readiness — the API remains correct without fresh ingestion).
+  // Never exposes secrets or provider quotas.
+  app.get("/v1/ready", async (_req, reply) => {
+    const parts: Record<string, string> = {};
+    let ok = true;
+
+    try {
+      await db.query("SELECT 1");
+      parts.database = "ok";
+    } catch {
+      parts.database = "unreachable";
+      ok = false;
+    }
+
+    try {
+      if (app.sharedCache) {
+        await app.sharedCache.get("heat:readiness:probe");
+        parts.cache = "ok";
+      } else {
+        parts.cache = "local";
+      }
+    } catch {
+      parts.cache = "unreachable";
+      ok = false;
+    }
+
+    try {
+      const { rows } = await db.query<{ seconds: number | null }>(
+        `SELECT EXTRACT(EPOCH FROM (now() - MAX(started_at)))::int AS seconds
+         FROM ingestion_runs WHERE status IN ('success','partial')`,
+      );
+      const seconds = rows[0]?.seconds;
+      if (seconds == null) {
+        parts.worker = "never_run";
+      } else {
+        parts.worker = seconds < 21_600 ? "fresh" : "stale";
+      }
+    } catch {
+      parts.worker = "unknown";
+    }
+
+    reply.code(ok ? 200 : 503);
+    return { status: ok ? "ready" : "degraded", ...parts, version: app.gitSha, time: new Date().toISOString() };
   });
 
   // Phase C — effective flags = compiled defaults overridden by DB rows.
