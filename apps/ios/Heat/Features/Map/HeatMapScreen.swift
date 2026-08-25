@@ -127,6 +127,22 @@ struct HeatMapScreen: View {
         selection.refreshIfStale()
     }
 
+    /// Details sheet opens once a location mode is confirmed (M6 over map).
+    /// R2-005 — `.published` closes the sheet: store already reset the draft.
+    private var createDetailsBinding: Binding<Bool> {
+        Binding(get: {
+            switch create.step {
+            case .requiredDetails, .optionalDetails, .checkingDuplicates,
+                 .reviewDuplicates, .publishing:
+                return true
+            default:
+                return false
+            }
+        }, set: { shown in
+            if !shown { cancelCreate() }
+        })
+    }
+
     // MARK: Derived data -----------------------------------------------------
 
     /// Starred mode (M8): de-emphasis server-side filter keeps geography.
