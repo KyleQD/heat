@@ -1,0 +1,1111 @@
+{
+  "project": "HEAT",
+  "version": "1.1",
+  "audit_commit": "c324183bc61c6c464f3ef5de54b3dfde439bf593",
+  "status_values": [
+    "not_started",
+    "partial",
+    "in_progress",
+    "blocked",
+    "in_review",
+    "done"
+  ],
+  "phases": [
+    {
+      "phase": "R2",
+      "title": "Remediation Round 2",
+      "tickets": [
+        {
+          "id": "R2-001",
+          "title": "Rebuild discovery query composition",
+          "priority": "P0",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "HeatKitCheck R2-001 block (stationary window/category/starred compose; key covers filters)"
+          ]
+        },
+        {
+          "id": "R2-002",
+          "title": "Fix personalized Starred cache isolation",
+          "priority": "P0",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "apps/api/test/remediation2.test.ts 'personalized cache isolation' (A/B/anonymous)"
+          ]
+        },
+        {
+          "id": "R2-003",
+          "title": "Actor-scoped create idempotency",
+          "priority": "P0",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "migration 0018 + remediation2.test.ts actor-scope cases + HeatKitCheck attempt-key lifecycle"
+          ]
+        },
+        {
+          "id": "R2-004",
+          "title": "Create payload parity",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "remediation2.test.ts description persistence"
+          ]
+        },
+        {
+          "id": "R2-005",
+          "title": "Create reset/success lifecycle",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "CreateStore.resetDraft lifecycle; sheet closes on .published (HeatMapScreen binding)"
+          ]
+        },
+        {
+          "id": "R2-006",
+          "title": "Explicit discovery invalidation",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "DiscoveryStore.invalidateAndRefresh called on create success"
+          ]
+        },
+        {
+          "id": "R2-007",
+          "title": "Star hydration/reconciliation",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "hydrateFromServer at boot + reconcile(false) removals + batch reconcile from map"
+          ]
+        },
+        {
+          "id": "R2-008",
+          "title": "Current-location creation UI",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "CreateLocationBar Use My Location with denied/locating hints"
+          ]
+        },
+        {
+          "id": "R2-009",
+          "title": "Unified enhanced route state",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "RouteStore.displayOption unified; map polyline + panel consume it; MKDirections provider injected"
+          ]
+        },
+        {
+          "id": "R2-010",
+          "title": "Travel-mode-correct handoff",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "NavigationHandoffURLs mode-correct params; Bike disabled for V1 GO"
+          ]
+        },
+        {
+          "id": "R2-011",
+          "title": "Search lifecycle filtering",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "searchRepository lifecycle WHERE clause + remediation2 test"
+          ]
+        },
+        {
+          "id": "R2-012",
+          "title": "PATCH map cache invalidation",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "events.routes PATCH invalidates mapCache"
+          ]
+        },
+        {
+          "id": "R2-013",
+          "title": "Route request correlation",
+          "priority": "P1",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "routing.routes correlated UPDATE ... AND event_id + regression"
+          ]
+        },
+        {
+          "id": "R2-014",
+          "title": "Complete route rate limits",
+          "priority": "P2",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "limits.ts duplicateProbe/starredList/starMetrics/cities presets applied"
+          ]
+        },
+        {
+          "id": "R2-015",
+          "title": "Readiness reporting tied to evidence",
+          "priority": "P2",
+          "status": "done",
+          "owner": "codex-agent",
+          "notes": "",
+          "evidence": [
+            "docs/LAUNCH_READINESS.md rewritten around executable gates"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "B",
+      "tickets": [
+        {
+          "id": "HEAT-B001",
+          "title": "Deterministic XcodeGen CI",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B002",
+          "title": "Debug/Staging/Release configurations",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B003",
+          "title": "Remove release API placeholder",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B004",
+          "title": "Signing/team/bundle IDs",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B005",
+          "title": "App icon/resources",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B006",
+          "title": "Universal link entitlement decision",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B007",
+          "title": "Real iOS app build/test CI",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B008",
+          "title": "Archive validation",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B009",
+          "title": "Strengthen backend CI",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B010",
+          "title": "Protect main/required checks",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B011",
+          "title": "Release version strategy",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-B012",
+          "title": "TestFlight pipeline",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "phase": "C",
+      "tickets": [
+        {
+          "id": "HEAT-C001",
+          "title": "Managed PostGIS environments",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C002",
+          "title": "DB roles/least privilege",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C003",
+          "title": "Redis/shared cache",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C004",
+          "title": "Runtime feature flags",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C005",
+          "title": "Secrets management",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C006",
+          "title": "API deployment pipeline",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C007",
+          "title": "Health/readiness",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C008",
+          "title": "Backup/restore drill",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C009",
+          "title": "Migration release process",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C010",
+          "title": "Scheduled job runtime",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C011",
+          "title": "Environment isolation tests",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-C012",
+          "title": "Production runbooks",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "phase": "D",
+      "tickets": [
+        {
+          "id": "HEAT-D001",
+          "title": "Provider adapter contract",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D002",
+          "title": "Fetch-run/raw tables",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D003",
+          "title": "Raw payload retention policy",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D004",
+          "title": "Normalized provider candidate types",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D005",
+          "title": "Pagination/retry/quota behavior",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D006",
+          "title": "City/time query strategy",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D007",
+          "title": "Refresh schedule tiers",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D008",
+          "title": "Source upsert",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D009",
+          "title": "Cancellation/postponement refresh",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D010",
+          "title": "Ticket URL validation",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D011",
+          "title": "Provider health metrics",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D012",
+          "title": "Disable fixtures in production",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-D013",
+          "title": "Provider replay integration test",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "phase": "E",
+      "tickets": [
+        {
+          "id": "HEAT-E001",
+          "title": "Normalization helpers",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E002",
+          "title": "Venue resolver",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E003",
+          "title": "Event candidate search",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E004",
+          "title": "Resolution features",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E005",
+          "title": "Match scoring/policy",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E006",
+          "title": "Decision classes",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E007",
+          "title": "Decision audit schema",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E008",
+          "title": "Manual review queue",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E009",
+          "title": "Merge reversal",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E010",
+          "title": "Las Vegas truth corpus",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E011",
+          "title": "Precision/recall metrics",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-E012",
+          "title": "Native/provider collision resolution",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "phase": "F",
+      "tickets": [
+        {
+          "id": "HEAT-F001",
+          "title": "Moderation API",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F002",
+          "title": "Moderator roles/authorization",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F003",
+          "title": "Event moderation state",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F004",
+          "title": "Report aggregation/severity",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F005",
+          "title": "Ticket-link moderation",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F006",
+          "title": "Event claim workflow",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F007",
+          "title": "Verification policy",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F008",
+          "title": "Apple identity/account upgrade",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F009",
+          "title": "Session hardening",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F010",
+          "title": "Account deletion",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F011",
+          "title": "Rate-limit classes",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F012",
+          "title": "Abuse detection baseline",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F013",
+          "title": "Admin audit log",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-F014",
+          "title": "Moderation runbooks",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "phase": "G",
+      "tickets": [
+        {
+          "id": "HEAT-G001",
+          "title": "Versioned scoring config",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G002",
+          "title": "Signal observation model",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G003",
+          "title": "Freshness weighting",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G004",
+          "title": "Confidence calibration",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G005",
+          "title": "Calibration dataset",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G006",
+          "title": "Shadow scoring",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G007",
+          "title": "Score diagnostics",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G008",
+          "title": "Production routing adapter",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G009",
+          "title": "Routing degradation",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G010",
+          "title": "Route mode correctness regression",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G011",
+          "title": "Routing privacy verification",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-G012",
+          "title": "HEAT operational dashboards",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "phase": "H",
+      "tickets": [
+        {
+          "id": "HEAT-H001",
+          "title": "Device matrix",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H002",
+          "title": "Dense map benchmark",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H003",
+          "title": "Rapid camera cancellation",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H004",
+          "title": "Network condition matrix",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H005",
+          "title": "Location permission matrix",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H006",
+          "title": "VoiceOver",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H007",
+          "title": "Dynamic Type",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H008",
+          "title": "Reduce Motion",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H009",
+          "title": "Contrast",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H010",
+          "title": "Battery/network budget",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H011",
+          "title": "Foreground/background lifecycle",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H012",
+          "title": "Time/DST",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H013",
+          "title": "URL/deep-link",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H014",
+          "title": "Leak/memory profiling",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-H015",
+          "title": "Crash monitoring",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "phase": "I",
+      "tickets": [
+        {
+          "id": "HEAT-I001",
+          "title": "Venue truth set",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-I002",
+          "title": "Nightly event QA",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-I003",
+          "title": "Beta cohort",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-I004",
+          "title": "Feedback loop",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-I005",
+          "title": "Decision funnel dashboard",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-I006",
+          "title": "Event supply KPIs",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-I007",
+          "title": "HEAT quality sessions",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-I008",
+          "title": "Route field testing",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-I009",
+          "title": "Moderation load",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-I010",
+          "title": "Beta defect process",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "phase": "J",
+      "tickets": [
+        {
+          "id": "HEAT-J001",
+          "title": "App Store identity",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-J002",
+          "title": "Screenshots",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-J003",
+          "title": "Privacy declarations",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-J004",
+          "title": "Terms/community rules",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-J005",
+          "title": "Support workflow",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-J006",
+          "title": "Incident response",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-J007",
+          "title": "Production dashboards",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-J008",
+          "title": "Staged rollout",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-J009",
+          "title": "Provider licensing/terms review",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        },
+        {
+          "id": "HEAT-J010",
+          "title": "City expansion lock",
+          "status": "not_started",
+          "owner": null,
+          "notes": "",
+          "evidence": []
+        }
+      ]
+    }
+  ]
+}

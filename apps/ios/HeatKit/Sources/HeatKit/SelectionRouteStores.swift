@@ -137,9 +137,43 @@ public final class StarStore: ObservableObject {
     }
 
     /// Sync starred state from a server response (map/detail payloads).
+    /// R2-007 — an explicit server `false` REMOVES the id; only `null`
+    /// (unauthenticated payload) leaves local state untouched.
     public func reconcile(id: UUID, starred: Bool?, count: Int) {
         counts[id] = count
-        if starred == true { starredIds.insert(id) }
+        switch starred {
+        case .some(true): starredIds.insert(id)
+        case .some(false): starredIds.remove(id)
+        case .none: break
+        }
+    }
+
+    /// Reconcile a batch of map markers in one pass.
+    public func reconcile(from events: [MapEvent]) {
+        for e in events where e.starred != nil {
+            reconcile(id: e.id, starred: e.starred, count: e.starCount)
+        }
+    }
+
+    /// R2-007 — boot hydration: with a persisted session, restore the
+    /// starred set so map/detail/Starred filter agree after relaunch.
+    @discardableResult
+    public func hydrateFromServer() async -> Bool {
+        guard api.currentToken != nil else { return false }
+        struct Response: Decodable { let items: [Item] }
+        struct Item: Decodable {
+            let eventId: UUID
+            let starredAt: Date
+        }
+        do {
+            let decoded: Response = try await api.get(path: "/v1/me/starred-events", authenticated: true)
+            for item in decoded.items {
+                starredIds.insert(item.eventId)
+            }
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// Optimistic toggle (P5-004/006). Rapid taps are serialized per event.
@@ -181,6 +215,15 @@ public final class StarStore: ObservableObject {
 
 // MARK: - Route store (P6-002..P6-013) — GO state machine
 
+/// R2-009 — on-device road routing seam. HeatKit stays platform-pure; the app
+/// target injects an MKDirections-backed implementation. Returning nil keeps
+/// the server estimate as the guaranteed baseline (GO-AC-005).
+public protocol OnDeviceRoutingProviding: AnyObject {
+    func bestRoute(mode: TravelMode,
+                   origin: Coordinate,
+                   destination: Coordinate) async -> RouteOption?
+}
+
 @MainActor
 public final class RouteStore: ObservableObject {
 
@@ -192,19 +235,51 @@ public final class RouteStore: ObservableObject {
     }
 
     @Published public private(set) var phase: Phase = .idle
+    /// R2-009 — enhanced per-mode options owned HERE so the map polyline and
+    /// the route panel always render the same RouteOption.
+    @Published public private(set) var enhancedOptions: [TravelMode: RouteOption] = [:]
     private var currentEventId: UUID?
 
     private let api: APIClient
+    private let onDeviceRouting: OnDeviceRoutingProviding?
     private let location: LocationProviding
     private let analytics: AnalyticsClient
     private let starStore: StarStore
 
     public init(api: APIClient, location: LocationProviding,
-                analytics: AnalyticsClient, starStore: StarStore) {
+                analytics: AnalyticsClient, starStore: StarStore,
+                onDeviceRouting: OnDeviceRoutingProviding? = nil) {
         self.api = api
         self.location = location
         self.analytics = analytics
         self.starStore = starStore
+        self.onDeviceRouting = onDeviceRouting
+    }
+
+    /// The single display route for a mode: on-device enhancement when it
+    /// landed, otherwise the server estimate. Map + panel consume this.
+    public func displayOption(for mode: TravelMode) -> RouteOption? {
+        if let enhanced = enhancedOptions[mode] { return enhanced }
+        guard case .preview(let response, _) = phase else { return nil }
+        return response.routes.first(where: { $0.mode == mode })
+    }
+
+    /// Kick off an enhancement attempt for the selected mode.
+    public func enhanceSelectedMode(origin: Coordinate?) {
+        guard case .preview(let response, let mode) = phase,
+              let provider = onDeviceRouting,
+              enhancedOptions[mode] == nil,
+              let origin else { return }
+        let destination = response.destination
+        Task { [weak self] in
+            let option = await provider.bestRoute(mode: mode,
+                                                  origin: origin,
+                                                  destination: destination)
+            guard let self, let option else { return }
+            // Adopt only sane results (positive distance, same mode).
+            guard option.mode == mode, option.distanceMeters > 0 else { return }
+            self.enhancedOptions[mode] = option
+        }
     }
 
     public var previewResponse: RoutePreviewResponse? {
@@ -269,5 +344,6 @@ public final class RouteStore: ObservableObject {
 
     public func close() {
         phase = .idle
+        enhancedOptions = [:]
     }
 }

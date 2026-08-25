@@ -41,6 +41,18 @@ public final class CreateStore: ObservableObject {
     /// Center-pin coordinate while in location mode.
     @Published public var pinCoordinate: Coordinate?
 
+    /// R2-003 — generated ONCE per logical publish attempt, reused verbatim
+    /// across network retries of that attempt; cleared on reset/success so a
+    /// fresh attempt can never replay a previous one.
+    private(set) var publishAttemptKey: String?
+
+    private func ensureAttemptKey() -> String {
+        if let key = publishAttemptKey { return key }
+        let key = "ios-" + UUID().uuidString.lowercased()
+        publishAttemptKey = key
+        return key
+    }
+
     private let api: APIClient
     private let analytics: AnalyticsClient
     private let session: SessionStore
@@ -67,10 +79,23 @@ public final class CreateStore: ObservableObject {
         analytics.track(.eventCreationStarted, ["source": source])
     }
 
+    /// Explicit discard: wipes the draft entirely (R2-005).
     public func cancel() {
         step = .idle
+        resetDraft()
+    }
+
+    /// R2-005 — a second creation always starts blank. Recoverable failures
+    /// keep the draft; only success or explicit discard clears it.
+    public func resetDraft() {
+        publishAttemptKey = nil
         pinCoordinate = nil
         selectedVenueName = nil
+        let start = Calendar.current.date(byAdding: .hour, value: 3, to: Date())!
+        let end = Calendar.current.date(byAdding: .hour, value: 6, to: Date())!
+        draft = APIClient.CreateDraft(title: "", category: .party,
+                                      startsAt: start, endsAt: end,
+                                      lat: 0, lng: 0)
     }
 
     // -- Location modes (P3-004/005 + venue search) -------------------------
@@ -177,16 +202,23 @@ public final class CreateStore: ObservableObject {
             step = .failed(HEATError(code: .networkOffline, message: "Sign-in failed"))
             return
         }
+        let attemptKey = ensureAttemptKey()
         do {
-            let event = try await api.createEvent(draft: draft, allowDuplicate: allowDuplicate)
-            step = .published(event)
+            let event = try await api.createEvent(draft: draft,
+                                                  idempotencyKey: attemptKey,
+                                                  allowDuplicate: allowDuplicate)
+            // R2-005 lifecycle order:
+            // ingest canonical event → invalidate discovery → select the new
+            // event → reset draft. The sheet host closes on `.published`.
             selection.ingest(detail: event)
+            discovery.invalidateAndRefresh()   // R2-006 force path
             selection.select(eventId: event.id, source: .marker)
-            discovery.refetchIfPossible()
             analytics.track(.eventCreationPublished, [
                 "event_id": event.id.uuidString,
                 "category": event.category.rawValue,
             ])
+            resetDraft()
+            step = .published(event)
         } catch let error as HEATError {
             if error.code == .authRequired {
                 session.pendingAction = .createEvent

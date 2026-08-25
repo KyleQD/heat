@@ -74,6 +74,13 @@ final class AppEnvironment: ObservableObject {
         #else
         let baseURL = Bundle.main.infoDictionary?["HEAT_API_BASE_URL"] as? String ?? "https://api.heat.example"
         #endif
+        #if RELEASE
+        // Phase B guard: a release binary must never ship pointing at a
+        // placeholder host — fail at boot instead of at first tap.
+        if baseURL.contains(".invalid") || baseURL.contains("example") || baseURL.hasPrefix("http://localhost") {
+            fatalError("HEAT_RELEASE_API_URL was not injected into this build.")
+        }
+        #endif
         let tokens = KeychainTokenStore()
         api = APIClient(baseURL: URL(string: baseURL)!, tokens: tokens)
 
@@ -92,7 +99,8 @@ final class AppEnvironment: ObservableObject {
         stars = StarStore(api: api, analytics: analytics, discovery: discovery,
                           selection: selection, session: session)
         routes = RouteStore(api: api, location: locationService,
-                            analytics: analytics, starStore: stars)
+                            analytics: analytics, starStore: stars,
+                            onDeviceRouting: MKDirectionsRouteProvider())
         create = CreateStore(api: api, analytics: analytics, session: session,
                              selection: selection, discovery: discovery)
     }
@@ -110,6 +118,8 @@ final class AppEnvironment: ObservableObject {
 
     func bootstrap() async {
         analytics.track(.appOpened, ["platform": "ios"])
+        // R2-007 — restore persisted star state before first map paint uses it.
+        await stars.hydrateFromServer()
         // Config first so flags gate features before first paint completes.
         do {
             let config = try await api.config()

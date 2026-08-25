@@ -25,11 +25,12 @@ export async function createNativeEvent(
     await client.query("BEGIN");
 
     if (idempotencyKey) {
-      // Retry-safe: same key returns the original canonical event (TC-P3-004).
-      // Same key + different payload is a client bug -> stable conflict code.
+      // R2-003 — replay state is scoped to THIS actor: same key from a
+      // different user is an independent publish attempt.
       const existing = await client.query<{ event_id: string; request_hash: string | null }>(
-        "SELECT event_id, request_hash FROM native_event_submissions WHERE idempotency_key = $1",
-        [idempotencyKey],
+        `SELECT event_id, request_hash FROM native_event_submissions
+         WHERE creator_user_id = $1 AND idempotency_key = $2`,
+        [userId, idempotencyKey],
       );
       if (existing.rows[0]) {
         await client.query("COMMIT");
@@ -106,7 +107,8 @@ export async function createNativeEvent(
     );
     await client.query(
       `INSERT INTO native_event_submissions (id, event_id, creator_user_id, submitted_payload, duplicate_candidates, idempotency_key, request_hash)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (creator_user_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
       [
         crypto.randomUUID(),
         eventId,

@@ -88,11 +88,13 @@ export function registerRoutingRoutes(app: FastifyInstance, db: PgPoolLike): voi
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [crypto.randomUUID(), body.routeRequestId ?? null, req.user?.userId ?? null, eventId, mode, provider],
     );
+    // R2-013 — correlate the handoff to BOTH the route request and the event;
+    // a mismatched pair must not mark an unrelated request as started.
     if (body.routeRequestId && /^[0-9a-f-]{36}$/i.test(body.routeRequestId)) {
       await db.query(
         `UPDATE event_route_requests SET external_navigation_started_at = now()
-         WHERE id = $1`,
-        [body.routeRequestId],
+         WHERE id = $1 AND event_id = $2`,
+        [body.routeRequestId, eventId],
       );
     }
     await db.query(

@@ -111,6 +111,9 @@ export function registerEventRoutes(app: FastifyInstance, db: PgPoolLike): void 
       params,
     );
     await recalculateEventHeat(db, id).catch(() => undefined);
+    // R2-012 — title/time edits never move HEAT; invalidate directly instead
+    // of waiting for a score change to eventually bust the epoch.
+    app.mapCache.invalidateAll();
 
     const detail = await fetchEventDetail(db, id, req.user.userId);
     if (!detail) throw eventNotFound();

@@ -3,18 +3,85 @@ import HeatKit
 
 /// M5 — create location bar shown while pinning the event position.
 struct CreateLocationBar: View {
+    @EnvironmentObject private var env: AppEnvironment
     let onSelectVenue: (UUID, String, Coordinate) -> Void
+    let onUseMyLocation: () -> Void
     let onNext: () -> Void
     let onCancel: () -> Void
+
+    enum LocationHint: Equatable {
+        case none
+        case locating
+        case denied
+    }
+    @State private var hint: LocationHint = .none
 
     var body: some View {
         VStack(spacing: 10) {
             VenueSearchField(onVenue: onSelectVenue)
+
+            // R2-008 — visible current-location path; venue/pin stay usable
+            // regardless of permission outcome.
+            Button(action: useMyLocationTapped) {
+                Label(hint == .locating ? "Finding you…" : "Use My Location",
+                      systemImage: "location.circle.fill")
+                    .font(.footnote.weight(.bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.heatAccent.opacity(0.16), in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(.heatAccent)
+            }
+            .disabled(hint == .locating)
+            .accessibilityLabel("Use my current location for the event")
+
+            if hint == .denied {
+                Label("Location is off — drop a pin or search a venue instead.",
+                      systemImage: "location.slash")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
             pinRow
         }
         .panelStyle()
         .padding(.horizontal, 10)
         .padding(.bottom, 8)
+    }
+
+    private func useMyLocationTapped() {
+        switch env.locationService.authorizationState {
+        case .granted:
+            beginLocating()
+        case .denied, .restricted:
+            hint = .denied
+        default:
+            Task {
+                let state = await env.locationService.requestPermissionIfNeeded()
+                if state == .granted || env.locationService.currentCoordinate != nil {
+                    beginLocating()
+                } else {
+                    hint = .denied
+                }
+            }
+        }
+    }
+
+    private func beginLocating() {
+        hint = .locating
+        env.locationService.refreshLocation()
+        Task {
+            // Brief bounded wait for the first fix.
+            for _ in 0..<12 {
+                if let c = env.locationService.currentCoordinate {
+                    onUseMyLocation()
+                    _ = c
+                    hint = .none
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+            hint = .denied   // no fix available — steer to pin/venue paths
+        }
     }
 
     private var pinRow: some View {

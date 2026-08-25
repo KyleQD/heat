@@ -33,6 +33,10 @@ export async function searchEventsAndVenues(
       FROM events e
       LEFT JOIN venues v ON v.id = e.venue_id
       WHERE e.deleted_at IS NULL AND e.visibility_status = 'published'
+        -- R2-011 lifecycle policy: ordinary search never surfaces ended or
+        -- canceled events; postponed stays visible and status-marked.
+        AND e.status IN ('scheduled', 'postponed')
+        AND COALESCE(e.ends_at, e.starts_at + interval '4 hours') >= now()
         AND (e.normalized_title LIKE $1 OR LOWER(e.title) LIKE $1)
       ORDER BY COALESCE(e.heat_score, 0) DESC, e.starts_at ASC
       LIMIT $2

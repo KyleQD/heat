@@ -23,6 +23,8 @@ targets:
     platform: iOS
     sources:
       - path: Heat
+        excludes:
+          - "**/*.xcprivacy.bak"
     dependencies:
       - package: HeatKit
         product: HeatKit
@@ -31,15 +33,21 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.heatapp.ios
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: 0.2.0
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "HEAT uses your location to show events happening near you and to route you there. Your exact location is never stored."
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_CFBundleDisplayName: HEAT
         SUPPORTS_MACCATALYST: NO
-        # Dev builds point at the local API; release config overrides below.
+        # Debug points at the local stack; Release is injected per build below.
         HEAT_API_BASE_URL: http://localhost:8787
+      configs:
+        Release:
+          # Phase B: CI injects HEAT_RELEASE_API_URL; a placeholder in a
+          # release binary fails fast at boot (see AppEnvironment).
+          HEAT_API_BASE_URL: ${HEAT_RELEASE_API_URL:-https://unset.release.api.invalid}
     info:
       path: Heat/Info.plist
       properties:
@@ -61,7 +69,9 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: HeatKit/Tests/HeatKitTests
+      - path: Heat
+        excludes:
+          - "**/*.xcprivacy.bak"Kit/Tests/HeatKitTests
     dependencies:
       - target: Heat
       - package: HeatKit

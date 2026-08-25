@@ -179,7 +179,7 @@ public final class APIClient: @unchecked Sendable {
 
     // -- Map ----------------------------------------------------------------
 
-    public struct MapQuery: Sendable {
+    public struct MapQuery: Equatable, Sendable {
         public var north: Double, south: Double, east: Double, west: Double
         public var zoom: Int
         public var window: TimeWindow
@@ -309,36 +309,40 @@ public final class APIClient: @unchecked Sendable {
         return try decode(Response.self, from: data).candidates
     }
 
-    /// Publishes with an idempotency key stable across retries of the same
-    /// logical submission (CRT-AC-004).
-    public func createEvent(draft: CreateDraft, allowDuplicate: Bool = false) async throws -> EventDetail {
+    /// Publishes a logical creation attempt.
+    ///
+    /// R2-003 — the idempotency key is generated ONCE per publish attempt by
+    /// the caller (CreateStore) and reused verbatim across network retries of
+    /// that attempt. It is NOT derived from content, so identical events from
+    /// different users can never collide.
+    ///
+    /// R2-004 — payload parity: description and venueId ride along with the
+    /// required fields. Price/currency remain API-only for V1 (no UI fields).
+    public func createEvent(draft: CreateDraft,
+                            idempotencyKey: String,
+                            allowDuplicate: Bool = false) async throws -> EventDetail {
         _ = try await ensureSession()
         struct LocationPayload: Codable { let lat: Double; let lng: Double; let venueId: UUID? }
         struct Payload: Codable {
-            let title: String; let category: EventCategory
-            let startsAt: Date; let endsAt: Date
+            let title: String
+            let description: String?
+            let category: EventCategory
+            let startsAt: Date
+            let endsAt: Date
             let location: LocationPayload
             let ticketUrl: String?
         }
-        let payload = Payload(title: draft.title, category: draft.category,
+        let payload = Payload(title: draft.title,
+                              description: draft.descriptionText,
+                              category: draft.category,
                               startsAt: draft.startsAt, endsAt: draft.endsAt,
                               location: LocationPayload(lat: draft.lat, lng: draft.lng, venueId: draft.venueId),
                               ticketUrl: draft.ticketUrl)
-        var headers = ["Idempotency-Key": Self.idempotencyKey(for: draft)]
+        var headers = ["Idempotency-Key": idempotencyKey]
         if allowDuplicate { headers["X-Allow-Duplicate"] = "true" }
         struct Response: Decodable { let event: EventDetail }
         let data = try await request("POST", path: "/v1/events", body: payload, extraHeaders: headers)
         return try decode(Response.self, from: data).event
-    }
-
-    /// Deterministic per-draft key so a retry of the SAME draft cannot double-publish.
-    public static func idempotencyKey(for draft: CreateDraft) -> String {
-        let material = "\(draft.title)|\(draft.category)|\(draft.startsAt.timeIntervalSince1970)|\(draft.lat),\(draft.lng)"
-        var h: UInt64 = 5381
-        for byte in material.utf8 {
-            h = (h &* 33) ^ UInt64(byte)
-        }
-        return "ios-\(String(h, radix: 36))"
     }
 
     // -- Config fetch (see above) -------------------------------------------
@@ -358,6 +362,13 @@ public final class APIClient: @unchecked Sendable {
                          authenticated: Bool) async throws -> Data {
         let url = baseURL.appendingPathComponent(path)
         return try await rawRequest(method, url: url, authenticated: authenticated)
+    }
+
+    /// Typed GET for simple JSON endpoints (e.g. star hydration, R2-007).
+    public func get<T: Decodable>(_ type: T.Type = T.self, path: String, authenticated: Bool = false) async throws -> T {
+        let data = try await request("GET", path: path, authenticated: authenticated)
+        do { return try decoder.decode(T.self, from: data) }
+        catch { throw HEATError(code: .decodingFailed, message: "\(error)") }
     }
 
     private func request<B: Encodable>(_ method: String, path: String,

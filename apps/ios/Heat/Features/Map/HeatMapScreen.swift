@@ -105,6 +105,13 @@ struct HeatMapScreen: View {
             withAnimation { overlayMode = .explore }
             selection.select(eventId: id, source: .search)
         }
+        .onChange(of: discovery.events) { events in
+            stars.reconcile(from: events)
+        }
+        .onChange(of: selection.detail?.stars) { starsInfo in
+            guard let d = selection.detail, let info = starsInfo else { return }
+            stars.reconcile(id: d.id, starred: info.starredByViewer, count: info.count)
+        }
         .onChange(of: selection.detail?.id) { detailId in
             // Deep-link fly-to once the target detail lands.
             if let detailId, env.pendingDeepLinkEventId == detailId,
@@ -124,9 +131,11 @@ struct HeatMapScreen: View {
     /// Details sheet opens once a location mode is confirmed (M6 over map).
     private var createDetailsBinding: Binding<Bool> {
         Binding(get: {
+            // R2-005 — `.published` intentionally CLOSES the sheet: the store
+            // already selected the new event and reset the draft.
             switch create.step {
             case .requiredDetails, .optionalDetails, .checkingDuplicates,
-                 .reviewDuplicates, .publishing, .published:
+                 .reviewDuplicates, .publishing:
                 return true
             default:
                 return false
@@ -145,7 +154,10 @@ struct HeatMapScreen: View {
     }
 
     private var routePolylineCoords: [Coordinate] {
-        guard let polyline = routes.previewResponse?.routes.first(where: { $0.mode == routes.selectedMode })?.polyline else { return [] }
+        // R2-009 — same RouteOption the panel displays (enhanced or estimate).
+        guard case .preview(_, let mode) = routes.phase,
+              let option = routes.displayOption(for: mode),
+              let polyline = option.polyline else { return [] }
         return PolylineDecoder.decode(polyline)
     }
 
@@ -193,6 +205,7 @@ struct HeatMapScreen: View {
                         create.selectVenue(id: id, name: name, coordinate: coordinate)
                         withAnimation { overlayMode = .explore }
                     },
+                    onUseMyLocation: useMyLocationForCreate,
                     onNext: proceedWithPin,
                     onCancel: cancelCreate)
             case .search:
@@ -308,14 +321,11 @@ struct HeatMapScreen: View {
         }
         lastKnownCenter = region.center
         guard overlayMode != .search else { return }
-        let query = APIClient.MapQuery(
+        // R2-001 — the store retains geometry only and joins CURRENT filter
+        // state at fetch time, so stationary filter changes always re-query.
+        discovery.viewportChanged(DiscoveryStore.ViewportGeometry(
             north: region.north, south: region.south, east: region.east, west: region.west,
-            zoom: Int(region.zoom),
-            window: discovery.window,
-            category: discovery.categoryFilter,
-            starredOnly: discovery.starredOnlyMode,
-            includeStarredState: true)
-        discovery.viewportChanged(query)
+            zoom: Int(region.zoom)))
     }
 
     private func handleSelectEvent(id: UUID) {
@@ -353,8 +363,10 @@ struct HeatMapScreen: View {
             return
         }
         Task {
+            // R2-010 — Bike stays out of V1 GO: no cycling-capable provider is
+            // wired yet, and we never silently convert it to driving.
             await routes.requestPreview(destination: detail.routeDestination,
-                                        modes: TravelMode.allCases,
+                                        modes: [.drive, .walk, .transit],
                                         eventId: detail.id)
             withAnimation(.spring(response: 0.4)) { overlayMode = .routePreview }
         }
@@ -395,6 +407,13 @@ struct HeatMapScreen: View {
     @State private var lastKnownCenter: Coordinate?
 
     private func beginCreateFromEmptyState() { beginCreate(source: "empty_state") }
+
+    /// R2-008 — wire the bar's Use-My-Location into existing store logic.
+    private func useMyLocationForCreate() {
+        guard let c = env.locationService.currentCoordinate else { return }
+        create.useCurrentLocation(c)
+        withAnimation { overlayMode = .explore }
+    }
 
     private func proceedWithPin() {
         guard let pin = create.pinCoordinate ?? lastKnownCenter else { return }

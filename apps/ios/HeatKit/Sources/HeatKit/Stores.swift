@@ -121,25 +121,56 @@ public final class DiscoveryStore: ObservableObject {
         didSet { if oldValue != starredOnlyMode { applyStarredPresentation() } }
     }
 
+    /// R2-001 — retained camera geometry ONLY. Filters live in their own
+    /// published properties and are joined at fetch time, so stationary
+    /// NOW/TONIGHT/category/starred changes always alter the next request.
+    public struct ViewportGeometry: Equatable, Sendable {
+        public let north: Double, south: Double, east: Double, west: Double
+        public let zoom: Int
+
+        public init(north: Double, south: Double, east: Double, west: Double, zoom: Int) {
+            self.north = north; self.south = south; self.east = east; self.west = west; self.zoom = zoom
+        }
+    }
+
     private let api: APIClient
     private let analytics: AnalyticsClient
     /// Debounce + cancellation per P1-005/P1-008: rapid panning cancels obsolete requests.
     private var fetchTask: Task<Void, Never>?
     private var lastQueryKey: String?
-    private var viewport: APIClient.MapQuery?
+    private var viewport: ViewportGeometry?
 
     public init(api: APIClient, analytics: AnalyticsClient) {
         self.api = api
         self.analytics = analytics
     }
 
+    /// The exact request the NEXT fetch would issue (viewport + current
+    /// filters). Exposed for tests and diagnostics.
+    public func composeQuery() -> APIClient.MapQuery? {
+        guard let v = viewport else { return nil }
+        return APIClient.MapQuery(
+            north: v.north, south: v.south, east: v.east, west: v.west,
+            zoom: v.zoom,
+            window: window,
+            category: categoryFilter,
+            starredOnly: starredOnlyMode,
+            // Personalized dimension rides along whenever we hold a session;
+            // anonymous responses simply carry starred=null.
+            includeStarredState: true)
+    }
+
     public func setWindow(_ w: TimeWindow) {
         window = w
     }
 
-    /// Debounced viewport fetch; coalesces gesture-end events.
-    public func viewportChanged(_ query: APIClient.MapQuery, debounceMs: Int = 300) {
-        viewport = query
+    /// Debounced viewport updates; coalesces gesture-end events.
+    public func viewportChanged(_ geometry: ViewportGeometry, debounceMs: Int = 300) {
+        viewport = geometry
+        scheduleFetch(debounceMs: debounceMs)
+    }
+
+    private func scheduleFetch(debounceMs: Int) {
         fetchTask?.cancel()
         fetchTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(debounceMs) * 1_000_000)
@@ -149,8 +180,16 @@ public final class DiscoveryStore: ObservableObject {
     }
 
     public func refetchIfPossible() {
-        guard let v = viewport else { return }
-        viewportChanged(v, debounceMs: 0)
+        guard viewport != nil else { return }
+        scheduleFetch(debounceMs: 0)
+    }
+
+    /// R2-006 — force-fetch ignoring query-key equality. Used after canonical
+    /// writes (create/edit/moderation) so stationary viewports update instantly.
+    public func invalidateAndRefresh() {
+        lastQueryKey = nil
+        retryDelay = 4_000_000_000   // reset backoff: this is a fresh user intent
+        refetchIfPossible()
     }
 
     public func refresh() async {
@@ -158,11 +197,14 @@ public final class DiscoveryStore: ObservableObject {
     }
 
     private func queryKey(_ q: APIClient.MapQuery) -> String {
-        "\(q.north),\(q.south),\(q.east),\(q.west),z\(q.zoom),\(q.window.rawValue),\(q.category?.rawValue ?? "-"),\(q.starredOnly)"
+        ["\(q.north)", "\(q.south)", "\(q.east)", "\(q.west)",
+         "z\(q.zoom)", q.window.rawValue,
+         q.category?.rawValue ?? "-", q.starredOnly ? "s" : "a",
+         q.includeStarredState ? "ps" : "pu"].joined(separator: "|")
     }
 
     private func fetch() async {
-        guard let query = viewport else { return }
+        guard let query = composeQuery() else { return }
         let key = queryKey(query)
         guard key != lastQueryKey || state.isTerminalFailure else { return }
         lastQueryKey = key

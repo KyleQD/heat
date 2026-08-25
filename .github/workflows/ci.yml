@@ -45,15 +45,45 @@ jobs:
         run: npx vitest run
 
   ios-core:
-    name: iOS core logic — HeatKit checks
+    name: iOS core — HeatKit build + tests (required)
     runs-on: macos-15
     defaults:
       run:
         working-directory: apps/ios/HeatKit
     steps:
       - uses: actions/checkout@v4
+      # Full Xcode on the runner → XCTest is authoritative, never a warning.
       - run: swift build
-      - name: Verification harness (32 assertions)
+      - name: Verification harness
         run: swift run heatkit-check
-      - name: XCTest suite
-        run: swift test || echo "::warning::XCTest unavailable without full Xcode — harness above is authoritative here"
+      - name: XCTest suite (gating)
+        run: swift test
+
+  ios-app:
+    name: iOS app — xcodegen + build + unit tests (Phase B)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        working-directory: apps/ios
+        run: xcodegen generate
+      - name: Build app target (simulator, unsigned)
+        working-directory: apps/ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Heat.xcodeproj \
+            -scheme Heat \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify
+      - name: Unit tests via app scheme
+        working-directory: apps/ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Heat.xcodeproj \
+            -scheme Heat \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify

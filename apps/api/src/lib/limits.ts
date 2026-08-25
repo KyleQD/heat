@@ -16,6 +16,11 @@ export const RATE_LIMITS = {
   eventCreate: { max: 10, timeWindow: "1 hour" },
   reports: { max: 5, timeWindow: "1 hour" },
   analyticsBatch: { max: 30, timeWindow: "1 minute" },
+  // R2-014 — expensive/abuse-sensitive reads previously unprotected.
+  duplicateProbe: { max: 30, timeWindow: "1 minute" },
+  starredList: { max: 60, timeWindow: "1 minute" },
+  starMetrics: { max: 120, timeWindow: "1 minute" },
+  cities: { max: 60, timeWindow: "1 minute" },
 } as const;
 
 /** Absolute coordinate sanity (degrees). */

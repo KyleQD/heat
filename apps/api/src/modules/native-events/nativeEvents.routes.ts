@@ -22,7 +22,7 @@ import { authRequired, eventNotFound, invalidRequest, type AppError } from "../.
 import { RATE_LIMITS } from "../../lib/limits.js";
 
 export function registerNativeEventRoutes(app: FastifyInstance, db: PgPoolLike): void {
-  app.post("/v1/events/duplicate-check", async (req) => {
+  app.post("/v1/events/duplicate-check", { config: { rateLimit: RATE_LIMITS.duplicateProbe } }, async (req) => {
     const b = req.body as Record<string, unknown>;
     const title = typeof b.title === "string" ? b.title.trim() : "";
     const category = typeof b.category === "string" ? b.category : "";
@@ -81,8 +81,9 @@ export function registerNativeEventRoutes(app: FastifyInstance, db: PgPoolLike):
           event_id: string;
           request_hash: string | null;
         }>(
-          "SELECT event_id, request_hash FROM native_event_submissions WHERE idempotency_key = $1",
-          [idempotencyKey],
+          `SELECT event_id, request_hash FROM native_event_submissions
+           WHERE creator_user_id = $1 AND idempotency_key = $2`,
+          [req.user.userId, idempotencyKey],
         );
         const prior = existing.rows[0];
         if (prior) {

@@ -81,7 +81,7 @@ final class APIClientTests: XCTestCase {
                                               startsAt: Date(), endsAt: Date().addingTimeInterval(3600),
                                               lat: 36.15, lng: -115.2)
             draft.descriptionText = nil
-            _ = try await client.createEvent(draft: draft)
+            _ = try await client.createEvent(draft: draft, idempotencyKey: "dup-guard-key")
             XCTFail("expected duplicate guard error")
         } catch let e as HEATError {
             XCTAssertEqual(e.code, .duplicateEventLikely)
@@ -118,12 +118,14 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(starCalls, 2)
     }
 
-    func testCreateCarriesIdempotencyKeyHeader() async throws {
-        var captured: [String: String] = [:]
+    func testCreateCarriesCallerSuppliedIdempotencyKey() async throws {
+        // R2-003 — the caller owns the attempt key; identical drafts from
+        // different attempts use different keys by construction.
+        var captured: [String] = []
         let client = APIClient(baseURL: URL(string: "https://api.test")!)
         client.handler = { req in
             if let key = req.value(forHTTPHeaderField: "Idempotency-Key") {
-                captured["key"] = key
+                captured.append(key)
             }
             let detail = """
             {"id":"44444444-4444-4444-8444-444444444444","title":"T","description":null,"category":"party","status":"scheduled",
@@ -141,10 +143,12 @@ final class APIClientTests: XCTestCase {
         let draft = APIClient.CreateDraft(title: "Same Draft", category: .party,
                                           startsAt: start, endsAt: start.addingTimeInterval(3600),
                                           lat: 36.1, lng: -115.1)
-        _ = try await client.createEvent(draft: draft)
-        _ = try await client.createEvent(draft: draft)
-        XCTAssertNotNil(captured["key"])
-        // Same logical draft → same key (retry-safe).
-        XCTAssertEqual(captured["key"], APIClient.idempotencyKey(for: draft))
+        let attemptKey = "ios-test-attempt-1"
+        _ = try await client.createEvent(draft: draft, idempotencyKey: attemptKey)
+        _ = try await client.createEvent(draft: draft, idempotencyKey: attemptKey)
+        XCTAssertEqual(captured.count, 2, "both sends carried the header")
+        XCTAssertEqual(captured.first, attemptKey)
+        XCTAssertEqual(captured.last, attemptKey, "retry of the SAME attempt reuses the key verbatim")
+        XCTAssertNotEqual(attemptKey, "ios-test-attempt-2")
     }
 }

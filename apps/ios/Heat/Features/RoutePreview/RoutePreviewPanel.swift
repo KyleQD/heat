@@ -9,45 +9,18 @@ struct RoutePreviewPanel: View {
     @EnvironmentObject private var selection: SelectionStore
 
     let onClose: () -> Void
-    @StateObject private var enhancer = OnDeviceRouteEnhancer()
-    @State private var enhancedRoute: RouteOption?
 
-    /// Replace the selected mode's estimate with real road data when Apple
-    /// routing succeeds; otherwise the server option stays (GO-AC-005).
-    private func startEnhancement(for response: RoutePreviewResponse, mode: TravelMode) {
-        guard let origin = env.locationService.currentCoordinate,
-              let baseline = response.routes.first(where: { $0.mode == mode }),
-              enhancedRoute?.mode != mode else { return }
-        enhancer.enhance(mode: mode, origin: origin, destination: response.destination) { option in
-            // Only adopt if clearly better than the straight-line estimate.
-            if option.distanceMeters > 0 && option.provider == "apple_ondevice" {
-                enhancedRoute = option
-            }
-            _ = baseline
-        }
-    }
-
-    /// The route actually drawn + measured: enhanced when available.
-    private func displayOption(in response: RoutePreviewResponse, _ mode: TravelMode) -> RouteOption? {
-        if let e = enhancedRoute, e.mode == mode { return e }
-        return response.routes.first(where: { $0.mode == mode })
+    /// R2-009 — enhancement ownership lives in RouteStore; the panel simply
+    /// reads the same displayOption the map draws.
+    private func kickEnhancement() {
+        guard env.locationService.currentCoordinate != nil else { return }
+        routes.enhanceSelectedMode(origin: env.locationService.currentCoordinate)
     }
 
     var body: some View {
         content
-            .onAppear {
-                if case .preview(let response, let mode) = routes.phase {
-                    startEnhancement(for: response, mode: mode)
-                }
-            }
-            .onChange(of: routes.phase) { phase in
-                if case .preview(let response, let mode) = phase {
-                    enhancedRoute = nil
-                    startEnhancement(for: response, mode: mode)
-                } else {
-                    enhancedRoute = nil
-                }
-            }
+            .onAppear { kickEnhancement() }
+            .onChange(of: routes.phase) { _ in kickEnhancement() }
     }
 
     @ViewBuilder
@@ -84,7 +57,7 @@ struct RoutePreviewPanel: View {
                     Text(selection.detail?.title ?? "Destination")
                         .font(.subheadline.weight(.bold))
                         .lineLimit(1)
-                    if let option = displayOption(in: response, selectedMode) {
+                    if let option = routes.displayOption(for: selectedMode) {
                         Text(GeoMath.etaText(seconds: option.durationSeconds,
                                              meters: option.distanceMeters))
                             .font(.title3.weight(.heavy))
@@ -138,14 +111,19 @@ struct RoutePreviewPanel: View {
         Menu {
             ForEach(NavigationProvider.allCases, id: \.self) { provider in
                 Button(provider == .appleMaps ? "Apple Maps" : "Google Maps") {
+                    guard let mode = routes.selectedMode else { return }
                     Task {
                         await routes.startNavigation(provider: provider)
                         if let dest = routes.previewResponse?.destination {
-                            NavigationHandoff.open(provider, destination: dest,
+                            NavigationHandoff.open(provider,
+                                                   destination: dest,
+                                                   mode: mode,
                                                    label: selection.detail?.title)
                         }
                     }
                 }
+                // R2-010 — never offer a provider/mode pair we can't honor.
+                .disabled(!NavigationHandoffURLs.supports(provider, mode: routes.selectedMode ?? .drive))
             }
         } label: {
             Label("Start Route", systemImage: "location.north.circle.fill")

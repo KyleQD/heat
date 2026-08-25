@@ -27,8 +27,11 @@ export function registerMapRoutes(app: FastifyInstance, db: PgPoolLike): void {
     if (boundsError) throw invalidRequest(boundsError);
 
     const budget = eventBudgetForZoom(q.zoom);
-    // User-specific responses (starred state for a known viewer) bypass cache.
-    const userSpecific = q.includeStarredState === true && req.user != null;
+    // R2-002 — personalized requests are NEVER served from the shared cache:
+    // starredOnly results are actor-dependent even without includeStarredState.
+    const personalized =
+      req.user != null &&
+      (q.includeStarredState === true || q.starredOnly === true);
     const window_ = resolveTimeWindow(q.window, LAS_VEGAS);
 
     const load = async (): Promise<MapEventsResponse> => {
@@ -65,7 +68,7 @@ export function registerMapRoutes(app: FastifyInstance, db: PgPoolLike): void {
       };
     };
 
-    if (userSpecific) {
+    if (personalized) {
       return load();
     }
 

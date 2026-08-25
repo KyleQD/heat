@@ -101,7 +101,7 @@ export function registerSystemRoutes(app: FastifyInstance, db: PgPoolLike): void
     return { accepted: events.length, stored };
   });
 
-  app.get("/v1/cities/:cityKey", async (req) => {
+  app.get("/v1/cities/:cityKey", { config: { rateLimit: RATE_LIMITS.cities } }, async (req) => {
     const key = (req.params as { cityKey: string }).cityKey;
     const city = findCity(key);
     if (!city) {

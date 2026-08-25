@@ -37,7 +37,7 @@ export function registerStarRoutes(app: FastifyInstance, db: PgPoolLike): void {
     return { eventId: id, starred: result.starred, starCount: result.starCount };
   });
 
-  app.get("/v1/me/starred-events", async (req) => {
+  app.get("/v1/me/starred-events", { config: { rateLimit: RATE_LIMITS.starredList } }, async (req) => {
     if (!req.user) throw authRequired();
     const { rows } = await db.query<{
       eventId: string;
@@ -77,7 +77,7 @@ export function registerStarRoutes(app: FastifyInstance, db: PgPoolLike): void {
   });
 
   // Velocity aggregates exposed for the expanded sheet's star-activity line.
-  app.get("/v1/events/:id/star-metrics", async (req) => {
+  app.get("/v1/events/:id/star-metrics", { config: { rateLimit: RATE_LIMITS.starMetrics } }, async (req) => {
     const id = (req.params as { id: string }).id;
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw eventNotFound();
     const metrics_ = await starAggregates(db, id);
