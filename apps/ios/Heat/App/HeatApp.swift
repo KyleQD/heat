@@ -67,18 +67,29 @@ final class AppEnvironment: ObservableObject {
     private let analyticsBatcher: AnalyticsBatcher
 
     init() {
+        // B003 — no production placeholder fallback exists. Debug resolves
+        // env → Info.plist → local stack; any non-Debug binary MUST carry an
+        // injected HEAT_API_BASE_URL or it fails fast here.
         #if DEBUG
         let baseURL = ProcessInfo.processInfo.environment["HEAT_API_URL"]
             ?? Bundle.main.infoDictionary?["HEAT_API_BASE_URL"] as? String
             ?? "http://localhost:8787"
         #else
-        let baseURL = Bundle.main.infoDictionary?["HEAT_API_BASE_URL"] as? String ?? "https://api.heat.example"
+        guard let raw = Bundle.main.infoDictionary?["HEAT_API_BASE_URL"] as? String,
+              !raw.isEmpty,
+              let configured = URL(string: raw),
+              configured.scheme == "https"
+        else {
+            fatalError("Missing https HEAT_API_BASE_URL in this non-Debug build.")
+        }
+        let baseURL = raw
         #endif
-        #if RELEASE
-        // Phase B guard: a release binary must never ship pointing at a
-        // placeholder host — fail at boot instead of at first tap.
-        if baseURL.contains(".invalid") || baseURL.contains("example") || baseURL.hasPrefix("http://localhost") {
-            fatalError("HEAT_RELEASE_API_URL was not injected into this build.")
+        // Phase B guard: a release/staging binary must never ship pointing at
+        // a placeholder host — fail at boot instead of at first tap.
+        #if !DEBUG
+        if baseURL.contains(".invalid") || baseURL.contains("example")
+            || baseURL.hasPrefix("http://localhost") || baseURL.contains("unset.") {
+            fatalError("A real HEAT_API_BASE_URL was not injected into this build.")
         }
         #endif
         let tokens = KeychainTokenStore()

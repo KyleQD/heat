@@ -33,8 +33,37 @@ export function registerSystemRoutes(app: FastifyInstance, db: PgPoolLike): void
     };
   });
 
+  // Phase C — effective flags = compiled defaults overridden by DB rows.
+  async function effectiveFlags() {
+    const merged = { ...DEFAULT_FEATURE_FLAGS };
+    try {
+      const { rows } = await db.query<{ key: string; enabled: boolean }>(
+        "SELECT key, enabled FROM feature_flag_overrides",
+      );
+      for (const row of rows) {
+        if (row.key in merged) {
+          (merged as Record<string, boolean>)[row.key] = row.enabled;
+        }
+      }
+    } catch {
+      // Table missing pre-migration → defaults remain authoritative.
+    }
+    return merged;
+  }
+
+  function requireAdmin(headers: Record<string, unknown>): void {
+    const token = process.env.ADMIN_TOKEN;
+    if (!token) {
+      // Admin surface is entirely absent without an explicit admin token.
+      throw Object.assign(new Error("Not found"), { statusCode: 404, code: "FORBIDDEN" });
+    }
+    if (headers.authorization !== `Bearer ${token}`) {
+      throw Object.assign(new Error("Forbidden"), { statusCode: 403, code: "FORBIDDEN" });
+    }
+  }
+
   app.get("/v1/config", async () => ({
-    flags: DEFAULT_FEATURE_FLAGS,
+    flags: await effectiveFlags(),
     cities: CITIES.map((c) => ({
       cityKey: c.cityKey,
       displayName: c.displayName,
@@ -48,6 +77,39 @@ export function registerSystemRoutes(app: FastifyInstance, db: PgPoolLike): void
     })),
     scoringModelVersion: ENGINE_VERSION,
   }));
+
+  app.put("/v1/admin/flags", async (req, reply) => {
+    requireAdmin(req.headers);
+    const b = req.body as { key?: string; enabled?: boolean; reason?: string };
+    if (!b.key || typeof b.enabled !== "boolean") throw invalidRequest("key and enabled required");
+    reply.code(200);
+    await db.query(
+      `INSERT INTO feature_flag_overrides (key, enabled, reason, updated_by)
+       VALUES ($1,$2,$3,'admin')
+       ON CONFLICT (key) DO UPDATE SET enabled=EXCLUDED.enabled,
+         reason=EXCLUDED.reason, updated_at=now()`,
+      [b.key, b.enabled, b.reason ?? null],
+    );
+    return { key: b.key, enabled: b.enabled };
+  });
+
+  // Phase D — provider ingestion (flag-gated; dry-run supported).
+  app.post("/v1/admin/ingest/ticketmaster", async (req, reply) => {
+    requireAdmin(req.headers);
+    const { orchestrateTicketmasterIngestion } = await import("../ingestion/orchestrator.js");
+    const b = req.body as { dryRun?: boolean } | null;
+    const flags = await effectiveFlags();
+    if (!flags.ticketmaster_enabled && !b?.dryRun) {
+      return reply.status(409).send({
+        error: { code: "PROVIDER_UNAVAILABLE", message: "ticketmaster_enabled flag is off", requestId: null },
+      });
+    }
+    const outcome = await orchestrateTicketmasterIngestion(db, {
+      apiKey: process.env.TICKETMASTER_API_KEY,
+      dryRun: b?.dryRun === true,
+    });
+    return outcome;
+  });
 
   app.post("/v1/auth/session", { config: { rateLimit: RATE_LIMITS.sessionCreate } }, async (_req, reply) => {
     const session = await createAnonymousSession(db);

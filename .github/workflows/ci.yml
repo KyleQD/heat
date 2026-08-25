@@ -7,7 +7,7 @@ on:
 
 jobs:
   api:
-    name: API — typecheck + tests (+PostGIS integration)
+    name: api
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -41,15 +41,24 @@ jobs:
           npx tsc --noEmit -p ../../packages/config
           npx tsc --noEmit -p ../../packages/api-contracts
           npx tsc --noEmit -p .
+      - name: Dependency audit (prod deps, high+)
+        working-directory: .
+        run: npm audit --omit=dev --audit-level=high
       - name: Migrate + seed
         run: |
           npx tsx src/db/migrateCli.ts up
           npx tsx seeds/las_vegas.ts
       - name: Unit + integration tests
         run: npx vitest run
+      # B009 — migration rollback smoke on the newest migration, then re-apply,
+      # proving the reversible path stays executable (never cascading).
+      - name: Migration rollback smoke
+        run: |
+          npx tsx src/db/migrateCli.ts down
+          npx tsx src/db/migrateCli.ts up
 
   ios-core:
-    name: iOS core — HeatKit build + tests (required)
+    name: ios-core
     runs-on: macos-15
     defaults:
       run:
@@ -64,7 +73,7 @@ jobs:
         run: swift test
 
   ios-app:
-    name: iOS app — xcodegen + build + unit tests (Phase B)
+    name: ios-app
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +86,6 @@ jobs:
         working-directory: apps/ios
         run: |
           set -o pipefail
-          set -o pipefail
           xcodebuild build \
             -project Heat.xcodeproj \
             -scheme Heat \
@@ -88,10 +96,64 @@ jobs:
         working-directory: apps/ios
         run: |
           set -o pipefail
-          set -o pipefail
           xcodebuild test \
             -project Heat.xcodeproj \
             -scheme Heat \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/test.log | grep -E "Test Case|error:|TEST" || true
           grep -q "TEST SUCCEEDED" /tmp/test.log
+
+  # B008 — archive validation. A Staging archive must build cleanly and carry
+  # its real injected API URL, staging identity, version/build numbers, the
+  # app icon and the privacy manifest — no signing required for simulator.
+  ios-archive:
+    name: ios-archive
+    runs-on: macos-15
+    env:
+      CURRENT_PROJECT_VERSION: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        working-directory: apps/ios
+        run: xcodegen generate
+      - name: Archive Staging (generic simulator, unsigned)
+        working-directory: apps/ios
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Heat.xcodeproj \
+            -scheme Heat \
+            -destination 'generic/platform=iOS Simulator' \
+            -archivePath /tmp/Heat.xcarchive \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee /tmp/archive.log | grep -E "error:|ARCHIVE" || true
+          grep -q "ARCHIVE SUCCEEDED" /tmp/archive.log
+      - name: Validate archive contents
+        run: |
+          APP=$(find /tmp/Heat.xcarchive -name "*.app" -maxdepth 4 | head -1)
+          test -n "$APP"
+          PLIST="$APP/Info.plist"
+          url=$(/usr/libexec/PlistBuddy -c "Print :HEAT_API_BASE_URL" "$PLIST")
+          case "$url" in
+            https://*) ;;
+            *) echo "HEAT_API_BASE_URL not https: $url"; exit 1 ;;
+          esac
+          case "$url" in
+            *invalid*|*example*|*unset.*|*localhost*) echo "placeholder URL leaked: $url"; exit 1 ;;
+          esac
+          bid=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$PLIST")
+          test "$bid" = "com.heatapp.ios.staging"
+          name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$PLIST")
+          case "$name" in
+            HEAT|HEAT\ Staging) ;;
+            *) echo "unexpected display name: $name"; exit 1 ;;
+          esac
+          short=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
+          build=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST")
+          test -n "$short" && test "$build" -gt 0
+          minos=$(/usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$PLIST")
+          test "$minos" = "17.0"
+          test -f "$APP/AppIcon60x60@2x.png" || ls "$APP" | grep -q AppIcon
+          test -f "$APP/PrivacyInfo.xcprivacy"
+          echo "Archive validation passed: $bid $short ($build) → $url"

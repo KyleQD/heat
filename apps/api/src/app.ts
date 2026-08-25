@@ -6,7 +6,7 @@
  * carry request IDs and never contain tokens/secrets/exact coordinates.
  */
 import crypto from "node:crypto";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { loadEnv, type Env } from "./env.js";
 import { getPool, closePool } from "./db/pool.js";
@@ -116,7 +116,7 @@ export async function buildApp(envOverride?: Partial<Env>): Promise<FastifyInsta
   });
 
   // -- Stable error contract -----------------------------------------------
-  app.setErrorHandler((err, req, reply) => {
+  app.setErrorHandler((err: FastifyError, req, reply) => {
     if (err instanceof AppError) {
       metrics.inc("http_errors_total", { code: err.code });
       return reply.status(err.statusCode).send({

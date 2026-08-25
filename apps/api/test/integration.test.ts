@@ -6,22 +6,115 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
+import { LAS_VEGAS, resolveTimeWindow } from "@heat/config";
 
 let app: FastifyInstance;
 let token: string;
+/** Private pool for probe fixtures — the shared getPool() singleton is
+ * closed by app.close(); ending it twice crashes teardown. */
+let db: import("pg").Pool;
 
 const BBOX = "north=36.33&south=35.98&east=-114.94&west=-115.38";
 
 beforeAll(async () => {
+  const { Pool } = await import("pg");
+  db = new Pool({
+    connectionString: process.env.DATABASE_URL ?? "postgres://heat:heat@localhost:5433/heat",
+  });
   app = await buildApp();
   await app.ready();
   const res = await app.inject({ method: "POST", url: "/v1/auth/session" });
   token = res.json().token as string;
+  // Tonight-window probes MUST exist before the first tonight query: the map
+  // cache would otherwise serve earlier (probe-free) responses to later tests.
+  await seedTonightProbes();
 });
 
+/** Anchors probes INSIDE the resolved TONIGHT window (16:00–04:00 local) so
+ * assertions never depend on runner wall clock vs seed-time offsets. */
+async function seedTonightProbes(): Promise<void> {
+  const w = resolveTimeWindow("tonight", LAS_VEGAS, new Date());
+  const span = w.end.getTime() - w.start.getTime();
+  // After-midnight set (~90 min before window close).
+  await insertProbeEvent({
+    slug: "ab001",
+    title: "Probe After Midnight Vinyl",
+    categoryKey: "party",
+    lat: 36.1725,
+    lng: -115.1396,
+    startsAt: new Date(w.end.getTime() - 90 * 60_000),
+    endsAt: w.end,
+  });
+  // Canceled show mid-window.
+  const cxStart = new Date(w.start.getTime() + span * 0.4);
+  await insertProbeEvent({
+    slug: "cd002",
+    title: "Probe Canceled Harbor Set",
+    lat: 36.1701,
+    lng: -115.1442,
+    startsAt: cxStart,
+    endsAt: new Date(cxStart.getTime() + 2 * 3600_000),
+    status: "canceled",
+  });
+  // Same-venue staggered sets (Brooklyn Bowl).
+  const earlyStart = new Date(w.start.getTime() + span * 0.3);
+  await insertProbeEvent({
+    slug: "ef003",
+    title: "Probe Twilight Early Set",
+    lat: 36.1283,
+    lng: -115.1571,
+    startsAt: earlyStart,
+    endsAt: new Date(earlyStart.getTime() + 2 * 3600_000),
+  });
+  const lateStart = new Date(w.start.getTime() + span * 0.6);
+  await insertProbeEvent({
+    slug: "ef004",
+    title: "Probe Twilight Late Set",
+    lat: 36.1283,
+    lng: -115.1571,
+    startsAt: lateStart,
+    endsAt: new Date(lateStart.getTime() + 2 * 3600_000),
+  });
+}
+
 afterAll(async () => {
-  await app.close();
+  await app.close().catch(() => undefined);
+  try {
+    // Probe rows are self-contained and deterministic; remove them so reruns
+    // stay clean regardless of seed state.
+    await db.query(`DELETE FROM events WHERE title LIKE 'Probe %'`);
+  } finally {
+    await db.end();
+  }
 });
+
+/**
+ * Insert a deterministic probe event. Slug must be 5 hex characters so the
+ * fixed UUID stays valid across reruns (ON CONFLICT refreshes timing).
+ */
+
+async function insertProbeEvent(opts: {
+  slug: string;
+  title: string;
+  categoryKey?: string;
+  lat: number;
+  lng: number;
+  startsAt: Date;
+  endsAt: Date;
+  status?: string;
+}): Promise<string> {
+  const id = `99999999-1111-3111-8111-0000000${opts.slug}`.slice(0, 36);
+  await db.query(
+    `INSERT INTO events (id,title,normalized_title,category_id,location,starts_at,ends_at,starts_at_precision,status)
+     VALUES ($1,$2,$3,(SELECT id FROM event_categories WHERE key=$4),
+             ST_SetSRID(ST_MakePoint($6::float8,$5::float8),4326)::geography,$7,$8,'exact',$9)
+     ON CONFLICT (id) DO UPDATE SET starts_at=EXCLUDED.starts_at, ends_at=EXCLUDED.ends_at`,
+    [id, opts.title, opts.title.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim(),
+     opts.categoryKey ?? "music", opts.lat, opts.lng,
+     opts.startsAt, opts.endsAt, opts.status ?? "scheduled"],
+  );
+  return id;
+}
 
 async function mapQuery(extra = ""): Promise<{ events: Array<Record<string, unknown>>; heatPoints: unknown[]; clusters: Array<{ count: number }> }> {
   const res = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=now${extra}` });
@@ -60,7 +153,7 @@ describe("GEO viewport (GEO-AC-001..006)", () => {
       url: `/v1/map/events?${BBOX}&zoom=10&window=tonight`,
     });
     const titles = (res.json() as { events: Array<{ title: string }> }).events.map((e) => e.title);
-    expect(titles).toContain("Late Night Vinyl Sessions");
+    expect(titles).toContain("Probe After Midnight Vinyl");
   });
 
   it("canceled event is clearly status-marked (GEO-AC-004)", async () => {
@@ -69,7 +162,7 @@ describe("GEO viewport (GEO-AC-001..006)", () => {
       url: `/v1/map/events?${BBOX}&zoom=10&window=tonight`,
     });
     const canceled = (res.json() as { events: Array<{ title: string; status: string }> }).events.find(
-      (e) => e.title === "Harbor Lights Acoustic Evening",
+      (e) => e.title === "Probe Canceled Harbor Set",
     );
     expect(canceled?.status).toBe("canceled");
   });
@@ -77,7 +170,7 @@ describe("GEO viewport (GEO-AC-001..006)", () => {
   it("two same-venue events both render (GEO-AC-005)", async () => {
     const res = await app.inject({ method: "GET", url: `/v1/map/events?${BBOX}&zoom=10&window=tonight` });
     const body = res.json() as { events: Array<{ title: string }> };
-    const twilight = body.events.filter((e) => String(e.title).startsWith("Twilight Sessions"));
+    const twilight = body.events.filter((e) => String(e.title).startsWith("Probe Twilight"));
     expect(twilight.length).toBeGreaterThanOrEqual(2);
   });
 
