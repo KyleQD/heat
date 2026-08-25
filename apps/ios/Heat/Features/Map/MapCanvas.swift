@@ -27,10 +27,6 @@ final class MapCameraCommand: ObservableObject {
         handler?(.fly(coordinate, follow: false))
     }
 
-    func fly(to coordinate: Coordinate) {
-        handler?(.fly(coordinate, follow: false))
-    }
-
     func zoomIn(on coordinate: Coordinate) { handler?(.zoomIn(coordinate)) }
     func zoomOut() { handler?(.zoomOut) }
     func shiftUpForSheet() { handler?(.shiftUpForSheet) }
