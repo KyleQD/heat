@@ -19,7 +19,7 @@ final class MKDirectionsRouteProvider: OnDeviceRoutingProviding {
         request.requestsAlternateRoutes = false
 
         let directions = MKDirections(request: request)
-        return await withCheckedContinuation { continuation in
+        return await withCheckedContinuation { (continuation: CheckedContinuation<RouteOption?, Never>) in
             directions.calculate { response, _ in
                 guard let route = response?.routes.first else {
                     continuation.resume(returning: nil)

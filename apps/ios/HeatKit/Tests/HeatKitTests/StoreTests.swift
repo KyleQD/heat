@@ -50,11 +50,11 @@ final class StoreTests: XCTestCase {
     }
 
     /// Wrap detail for create-endpoint responses (client expects {"event":…}).
-    static func wrappedDetail() -> String {
+    nonisolated static func wrappedDetail() -> String {
         "{\"event\":\(detailJSON),\"trustLevel\":\"community\"}"
     }
 
-    static let detailJSON = """
+    nonisolated static let detailJSON = """
     {"id":"11111111-1111-3111-8111-111111111111","title":"Neon Skyline World Tour","description":null,
      "category":"music","status":"scheduled","verificationLevel":"multi_source_verified",
      "venue":{"id":"66666666-6666-3666-8666-666666666666","name":"Sphere","address":"255 Sands Ave","locality":"Las Vegas","capacity":18600},

@@ -59,7 +59,7 @@ struct RoutePreviewPanel: View {
                         .lineLimit(1)
                     if let option = routes.displayOption(for: selectedMode) {
                         Text(GeoMath.etaText(seconds: option.durationSeconds,
-                                             meters: option.distanceMeters))
+                                             meters: Double(option.distanceMeters)))
                             .font(.title3.weight(.heavy))
                             .foregroundStyle(.heatAccent)
                     }
@@ -177,7 +177,10 @@ struct RoutePreviewPanel: View {
     /// Fallback: destination-only external launch with address copy option.
     private func openExternalFallback() {
         guard let d = selection.detail else { return }
-        NavigationHandoff.open(.appleMaps, destination: d.routeDestination, label: d.title)
+        NavigationHandoff.open(.appleMaps,
+                               destination: d.routeDestination,
+                               mode: routes.selectedMode ?? .drive,
+                               label: d.title)
     }
 
     private func icon(_ mode: TravelMode) -> String {
