@@ -60,6 +60,11 @@ final class EventMarkerView: MKAnnotationView {
         didSet { guard oldValue != isSelectedState else { return }; applySelectionLook() }
     }
 
+    /// Selection emphasis is driven by the canvas sync (P4-009).
+    func setSelected(_ selected: Bool) {
+        isSelectedState = selected
+    }
+
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         commonInit()

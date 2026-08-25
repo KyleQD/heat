@@ -22,6 +22,11 @@ final class MapCameraCommand: ObservableObject {
         handler?(.fly(coordinate, follow: preserveFollow))
     }
 
+    /// Convenience for deep links / search results.
+    func fly(to coordinate: Coordinate) {
+        handler?(.fly(coordinate, follow: false))
+    }
+
     func fly(to coordinate: Coordinate) {
         handler?(.fly(coordinate, follow: false))
     }
@@ -268,7 +273,7 @@ final class CanvasCoordinator: NSObject, MKMapViewDelegate {
     private func applySelection(_ selectedId: UUID?, on map: MKMapView) {
         for case let ann as EventAnnotation in map.annotations where ann.view != nil {
             let isSelected = ann.id == selectedId
-            ann.view?.isSelectedState = isSelected
+            ann.view?.setSelected(isSelected)
         }
     }
 
@@ -365,12 +370,15 @@ final class CanvasCoordinator: NSObject, MKMapViewDelegate {
         mapView.deselectAnnotation(view.annotation, animated: false)
         switch view.annotation {
         case let eventAnn as EventAnnotation:
-            onSelectEvent(eventAnn.id)
+            parent?.onSelectEvent(eventAnn.id)
         case let clusterAnn as ClusterAnnotation:
-            onSelectCluster(clusterAnn.cluster)   // server clusters zoom, never select (P12)
+            parent?.onSelectCluster(clusterAnn.cluster)   // clusters zoom, never select (P12)
         case let mkCluster as MKClusterAnnotation:
-            // Client collision-cluster: zoom into its span; still no selection.
-            mapView.setRegion(MKCoordinateRegion(region: mkCluster.region), animated: true)
+            // Client collision-cluster: zoom in; still never selects (P12).
+            let region = MKCoordinateRegion(center: mkCluster.coordinate,
+                                            latitudinalMeters: 800,
+                                            longitudinalMeters: 800)
+            mapView.setRegion(region, animated: true)
         default:
             break
         }

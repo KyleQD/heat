@@ -372,6 +372,11 @@ struct HeatMapScreen: View {
         }
     }
 
+    private func closeSelection() {
+        selection.clearSelection()
+        sheetExpanded = false
+    }
+
     private func closeRoute() {
         routes.close()
         withAnimation { overlayMode = .explore }
