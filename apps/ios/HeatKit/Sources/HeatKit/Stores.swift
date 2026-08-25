@@ -254,6 +254,12 @@ public final class DiscoveryStore: ObservableObject {
         }
     }
 
+    /// Test/preview seam: inject marker rows without network access.
+    public func injectForDiagnostics(_ rows: [MapEvent]) {
+        events = rows
+        state = .loaded(Date())
+    }
+
     private func ingest(_ response: MapEventsResponse, authenticated: Bool, includeStarredState: Bool) {
         events = response.events
         clusters = response.clusters

@@ -77,7 +77,10 @@ final class LocationService: NSObject, ObservableObject, LocationProviding {
 
     // MARK: LocationProviding (used by RouteStore — origin stays transient)
 
-    var locationAuthorization: LocationAuthorizationState { authorizationState }
+    /// Protocol entry point; delegates to the richer UI-facing flow.
+    func requestPermission() async -> LocationAuthorizationState {
+        await requestPermissionIfNeeded()
+    }
 }
 
 extension LocationService: CLLocationManagerDelegate {

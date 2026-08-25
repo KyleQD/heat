@@ -107,7 +107,7 @@ final class StoreTests: XCTestCase {
 
         let id = UUID(uuidString: "22222222-2222-3222-8222-222222222222")!
         await MainActor.run {
-            discovery.events = [Fixtures.mapEvent(id: id)]
+            discovery.injectForDiagnostics([Fixtures.mapEvent(id: id)])
             discovery.applyStar(eventId: id, starred: false, countDelta: 0)
         }
         await stars.toggleStar(id)   // star succeeds

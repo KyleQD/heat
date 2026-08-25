@@ -1,4 +1,8 @@
 
+import MapKit
+import SwiftUI
+import HeatKit
+
 // MARK: - Client-side collision cluster (mid-zoom merge of nearby markers)
 
 final class ClientClusterView: MKAnnotationView {

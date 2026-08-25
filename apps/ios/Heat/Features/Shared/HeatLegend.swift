@@ -1,3 +1,5 @@
+import SwiftUI
+import HeatKit
 
 // MARK: - Heat legend (color must not be the only signal — a11y §16)
 
