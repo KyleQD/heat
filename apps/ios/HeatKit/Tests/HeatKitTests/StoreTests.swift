@@ -19,6 +19,10 @@ final class StoreTests: XCTestCase {
                 return (custom(req), HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
             }
             let path = req.url!.path
+            if req.httpMethod == "POST", path == "/v1/events" {
+                return (Self.wrappedDetail().data(using: .utf8)!,
+                        HTTPURLResponse(url: req.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
+            }
             let body: String
             switch (req.httpMethod ?? "", path) {
             case ("POST", "/v1/auth/session"):
@@ -27,7 +31,7 @@ final class StoreTests: XCTestCase {
                 body = #"{"eventId":"11111111-1111-3111-8111-111111111111","starred":true,"starCount":99}"#
             case ("DELETE", _):
                 body = #"{"eventId":"11111111-1111-3111-8111-111111111111","starred":false,"starCount":41}"#
-            case ("GET", let p) where p.contains("/routes/preview"):
+            case (_, let p) where p.contains("/routes/preview"):
                 body = """
                 {"routeRequestId":"55555555-5555-3555-8555-555555555555",
                  "routes":[{"mode":"drive","durationSeconds":540,"distanceMeters":4100,"polyline":"abc","provider":"estimate_v1"},
@@ -43,6 +47,11 @@ final class StoreTests: XCTestCase {
                     HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
         return client
+    }
+
+    /// Wrap detail for create-endpoint responses (client expects {"event":…}).
+    static func wrappedDetail() -> String {
+        "{\"event\":\(detailJSON),\"trustLevel\":\"community\"}"
     }
 
     static let detailJSON = """
@@ -94,6 +103,10 @@ final class StoreTests: XCTestCase {
     func testUnstarRollsBackOnFailure() async {
         let client = APIClient(baseURL: URL(string: "https://api.test")!)
         client.handler = { req in
+            if req.httpMethod == "POST", req.url!.path == "/v1/auth/session" {
+                return (#"{"token":"tok"}"#.data(using: .utf8)!,
+                        HTTPURLResponse(url: req.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
+            }
             let status = (req.httpMethod == "DELETE") ? 500 : 200
             let body = #"{"eventId":"22222222-2222-3222-8222-222222222222","starred":true,"starCount":10}"#
             return (body.data(using: .utf8)!,

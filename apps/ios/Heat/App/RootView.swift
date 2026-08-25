@@ -16,12 +16,6 @@ struct RootView: View {
 extension Color {
     /// HEAT brand accent — ember orange.
     static let heatAccent = Color(red: 1.0, green: 0.48, blue: 0.22)
-}
-
-/// Enables `.background(.heatAccent)` / AnyShapeStyle(.heatAccent) usage.
-extension ShapeStyle where Self == Color {
-    static var heatAccent: Color { .heatAccent }
-}
 
     static func heatColor(forTier tier: HeatFormatters.HeatTier) -> Color {
         switch tier {
@@ -35,4 +29,9 @@ extension ShapeStyle where Self == Color {
     static func heatColor(score: Double) -> Color {
         heatColor(forTier: HeatFormatters.heatTier(score: score))
     }
+}
+
+/// Enables `.background(.heatAccent)` / `AnyShapeStyle(.heatAccent)` usage.
+extension ShapeStyle where Self == Color {
+    static var heatAccent: Color { .heatAccent }
 }
