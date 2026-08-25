@@ -172,11 +172,7 @@ final class ClusterMarkerView: MKAnnotationView {
     required init?(coder aDecoder: NSCoder) { fatalError("unsupported") }
 
     func configure(cluster: ClusterPoint) {
-        let color = UIColor(Color.heatColor(score: cluster.maxHeatScore))
-        if #available(iOS 16.0, *) {
-            backgroundConfiguration = UIBackgroundConfiguration.clear()
-        }
-        backgroundColor = color
+        backgroundColor = UIColor(Color.heatColor(score: cluster.maxHeatScore))
         layer.cornerRadius = 17
         bounds = CGRect(x: 0, y: 0, width: 34, height: 34)
         label.frame = bounds

@@ -23,6 +23,15 @@ final class StoreTests: XCTestCase {
                 return (Self.wrappedDetail().data(using: .utf8)!,
                         HTTPURLResponse(url: req.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
             }
+            if req.httpMethod == "POST", path == "/v1/events/duplicate-check" {
+                let candidate = """
+                [{"eventId":"77777777-7777-3777-8777-777777777777","title":"Red Rocks Revue",
+                  "venueName":"Sand Dollar","startsAt":"2026-08-25T03:00:00Z",
+                  "distanceMeters":0,"matchConfidence":0.91,"reasons":["similar_title"]}]
+                """
+                return (("{\"candidates\":\(candidate)}").data(using: .utf8)!,
+                        HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+            }
             let body: String
             switch (req.httpMethod ?? "", path) {
             case ("POST", "/v1/auth/session"):

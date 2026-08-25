@@ -294,7 +294,8 @@ struct EventBottomSheet: View {
     private func routeEtaText() -> String? {
         guard case .preview(let response, let mode) = routes.phase,
               let option = response.routes.first(where: { $0.mode == mode }) else { return nil }
-        return GeoMath.etaText(seconds: option.durationSeconds, meters: option.distanceMeters)
+        return GeoMath.etaText(seconds: option.durationSeconds,
+                               meters: Double(option.distanceMeters))
     }
 
     private func accessibilitySummary(_ d: EventDetail) -> String {
