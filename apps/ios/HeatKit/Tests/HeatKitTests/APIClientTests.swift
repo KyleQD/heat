@@ -82,6 +82,9 @@ final class APIClientTests: XCTestCase {
                         "startsAt":"2026-08-25T03:00:00Z","distanceMeters":0,"matchConfidence":0.94,"reasons":["similar_title"]}]}
         """.data(using: .utf8)!
         let client = clientWith { req in
+            if req.httpMethod == "POST", req.url!.path == "/v1/auth/session" {
+                return (201, #"{"token":"tok"}"#.data(using: .utf8)!)
+            }
             XCTAssertEqual(req.value(forHTTPHeaderField: "Content-Type"), "application/json")
             return (409, body)
         }
@@ -133,6 +136,10 @@ final class APIClientTests: XCTestCase {
         let captured = CaptureBox()
         let client = APIClient(baseURL: URL(string: "https://api.test")!)
         client.handler = { req in
+            if req.httpMethod == "POST", req.url!.path == "/v1/auth/session" {
+                return (#"{"token":"tok"}"#.data(using: .utf8)!,
+                        HTTPURLResponse(url: req.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
+            }
             if let key = req.value(forHTTPHeaderField: "Idempotency-Key") {
                 captured.append(key)
             }
@@ -145,7 +152,7 @@ final class APIClientTests: XCTestCase {
              "stars":{"count":0,"starredByViewer":false,"velocityPhrase":null},
              "routeDestination":{"lat":36,"lng":-115},"canEdit":true,"canReport":true,"canClaim":true,"sourceCount":1}
             """
-            return (#"{"event":\#(detail),"trustLevel":"community"}"#.replacingOccurrences(of: "\\#", with: "").data(using: .utf8)!,
+            return (Data("{\"event\":\(detail),\"trustLevel\":\"community\"}".utf8),
                     HTTPURLResponse(url: req.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
         }
         let start = Date(timeIntervalSince1970: 1_800_000_000)
