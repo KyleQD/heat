@@ -7,14 +7,16 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' })
 
 export const metadata: Metadata = {
-  title: 'HEAT — What’s happening near you',
-  description: 'Map-first discovery of events around you, powered by the Flow ecosystem.',
+  title: 'HEAT — See where the night is heating up',
+  description: 'A live heat map of events happening now and starting soon near you, driven by ticket sales and venue history. Part of the Flow ecosystem.',
 }
 
 export const viewport: Viewport = {
-  themeColor: '#f4f2ee',
+  themeColor: '#0a0e1a',
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

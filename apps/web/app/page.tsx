@@ -1,4 +1,4 @@
-import { HeatExplorer } from '@/components/heat-explorer'
+import { HeatApp } from '@/components/heat-app'
 import { createClient } from '@/lib/supabase/server'
 
 export default async function Page() {
@@ -7,5 +7,5 @@ export default async function Page() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  return <HeatExplorer userId={user?.id ?? null} userEmail={user?.email ?? null} />
+  return <HeatApp userId={user?.id ?? null} userEmail={user?.email ?? null} />
 }
