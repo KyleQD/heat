@@ -28,7 +28,7 @@ export function createStagingReceiver({ inbox, key, now = Date.now, onError = ()
       try { result = await inbox.apply(message); }
       catch (err) {
         if (err instanceof TypeError) throw new BridgeError('INVALID_PUBLICATION', 400);
-        if (err.message === 'Conflicting event revision') throw new BridgeError('REVISION_CONFLICT', 409);
+        if (err.message === 'Conflicting event revision' || err.message === 'Conflicting canonical mapping') throw new BridgeError('REVISION_CONFLICT', 409);
         throw err;
       }
       return send(200, { effect: result.effect, revision: result.state.revision, published: result.state.published, readiness: result.state.readiness });

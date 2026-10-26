@@ -2,7 +2,7 @@
 import { mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { projectPublication } from './publication.mjs';
+import { decodeDelivery, projectDelivery } from './map-context.mjs';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function openStagingInbox(directory) {
@@ -27,9 +27,10 @@ export async function openStagingInbox(directory) {
       if (closed) return Promise.reject(new Error('Inbox closed'));
       const snapshot = structuredClone(message);
       const task = tail.then(async () => {
-        const destination = file(snapshot.event_id);
-        const current = await read(snapshot.event_id);
-        const result = projectPublication(current, snapshot);
+        const { publication } = decodeDelivery(snapshot);
+        const destination = file(publication.event_id);
+        const current = await read(publication.event_id);
+        const result = projectDelivery(current, snapshot);
         if (result.effect.endsWith('ignored')) return result;
         const temporary = join(root, '.pending-' + randomUUID());
         try {

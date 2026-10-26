@@ -63,6 +63,39 @@ publish. Publication consent/authorization must be enforced in Tourify first.
 
 ## Next implementation sequence
 
+### Spatial extension and source policy added
+
+`map-context.mjs` supports a HEAT-only staging envelope without changing the
+pinned Flow v1 schema. Call the sender with `publication` plus optional
+`mapContext` containing: `event_id`, `publication_revision`, `venue_id`,
+`heat_event_id`, `heat_venue_id`, `lat`, `lng`, `timezone`, and `category`.
+The signed envelope binds those values to one source event/venue/revision.
+Category keys match HEAT's domain vocabulary; invalid/unknown location values
+are rejected. Canonical IDs must come from a trusted server-side resolution
+registry, not user input. This bridge validates shape/consistency; it cannot
+prove the referenced HEAT rows exist or that a proposed mapping is authorized.
+
+The durable projection now exposes `map-patch-ready` only with valid context.
+`heatEventMutation(state)` prepares a write intent using mapped HEAT IDs and
+existing event columns. It does not insert records or write SQL. Source IDs
+remain internal and no scores, attendance, verification badges or stars are
+invented. Removing context on a higher revision prepares hiding any old mapped
+row until enrichment is restored. Withdrawal clears coordinates/public content
+while retaining nonpublic reference mappings and revision tombstones.
+
+`source-policy.mjs` proposes fail-closed source eligibility for a future
+Tourify outbox. The inspected legacy visibility helpers default missing
+visibility to public; HEAT export instead requires explicit public evidence and
+rejects conflicting/private/unlisted flags. This function is not yet installed
+in Tourify and does not perform tenant authorization. A source becoming
+ineligible must produce a tombstone from its previous outbox reference; simply
+omitting it from the next batch is insufficient.
+
+Remaining DB writer work must verify mapping existence/ownership, handle shared
+event/venue aliases and canonical resolution, respect HEAT moderation holds,
+serialize revisions transactionally, and invalidate map/search/detail caches.
+Do not apply these intents blindly to arbitrary existing events.
+
 1. Locate the active Tourify source repository, production Auth issuer, user
    namespace, and public-event ownership. Flow main still contains legacy app
    code; the draft foundation is not a running shared-services backend.

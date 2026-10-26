@@ -97,3 +97,13 @@ test('sender treats server outage as retryable and blocks redirects', async () =
     return { ok: false, status: 503 };
   } }), err => err.status === 503 && err.retryable === true);
 });
+
+test('signed spatial envelope reaches durable map projection and withdrawal clears it', async t => {
+  const h = await harness(t);
+  const mapContext = { event_id: eventId, publication_revision: 1, venue_id: message().venue.venue_id, heat_event_id: '33333333-3333-4333-8333-333333333333', heat_venue_id: '44444444-4444-4444-8444-444444444444', lat: 36.1699, lng: -115.1398, timezone: 'America/Los_Angeles', category: 'music' };
+  const response = await deliverPublication({ baseUrl: h.url, key, publication: message(), mapContext });
+  assert.equal(response.readiness, 'map-patch-ready');
+  await h.restart(); assert.equal((await h.inbox.read(eventId)).map_context.lng, -115.1398);
+  assert.equal((await h.send(message(2, 'unpublished'))).published, false);
+  assert.equal((await h.inbox.read(eventId)).map_context, null);
+});
