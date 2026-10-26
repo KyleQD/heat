@@ -6,6 +6,7 @@ import type { NextConfig } from 'next'
 loadEnvConfig(path.resolve(process.cwd(), '../..'))
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['*.vercel.run', '*.vusercontent.net'],
   async headers() {
     return [
       {
