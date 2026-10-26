@@ -6,7 +6,8 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "apps/api"
+    "apps/api",
+    "apps/web"
   ],
   "engines": {
     "node": ">=22"
@@ -17,6 +18,8 @@
     "db:up": "docker compose -f infra/docker-compose.yml up -d",
     "db:migrate": "npm run migrate --workspace apps/api",
     "db:seed": "npm run seed --workspace apps/api",
-    "dev:api": "npm run dev --workspace apps/api"
+    "dev:api": "npm run dev --workspace apps/api",
+    "dev": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/web"
   }
 }

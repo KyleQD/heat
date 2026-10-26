@@ -6,3 +6,6 @@ apps/ios/Heat.xcodeproj
 apps/ios/HeatKit/.build
 apps/ios/xcuserdata
 derived/
+.next/
+apps/web/next-env.d.ts
+.env*.local
