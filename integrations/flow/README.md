@@ -61,6 +61,36 @@ Do not expose the staging receiver publicly or reuse a production secret.
 HMAC authenticates the dedicated publisher service, not an end user's right to
 publish. Publication consent/authorization must be enforced in Tourify first.
 
+### Transactional PostGIS staging mode
+
+`postgres-schema.sql` is a review proposal under this integration directory,
+not an automatically applied production migration. It adds a private inbox and
+resolver-owned source-to-canonical bindings. The test workflow applies it only
+to a disposable loopback PostGIS container after HEAT's existing migrations.
+
+`postgres-inbox.mjs` updates the existing canonical event row and inbox revision
+in the same transaction. It never creates duplicate canonical events/venues.
+Mappings must already exist and match the resolver-approved database binding.
+An advisory lock serializes first/concurrent deliveries; row locks and an
+expected `events.updated_at` prevent overwriting external edits or moderation.
+Hidden rows can be republished only when the bridge itself hid them and there
+has been no external edit. Existing scores/stars/attendance are untouched.
+Mapping revocation must be coordinated with withdrawal; do not delete bindings
+before processing retraction. Target editors must maintain `updated_at`.
+
+For an isolated local DB whose schema and bindings were explicitly prepared,
+set `FLOW_BRIDGE_STORAGE=postgres` and `FLOW_BRIDGE_DATABASE_URL` to that loopback
+database; run `node --import tsx integrations/flow/serve.mjs` after the repo's
+normal dependency install. The TypeScript loader imports HEAT's actual title
+normalizer. Non-loopback databases and production mode are refused. The live
+HEAT API/worker is still not registered with this adapter.
+
+DB tests exercise HEAT's real `queryViewport` and `fetchEventDetail` functions,
+covering publication, hiding/republication, stale replay, concurrent revisions,
+unapproved mapping, moderation, missing context and transaction rollback.
+Cache invalidation, real publisher authorization, resolver provisioning and
+production migration review remain required before runtime integration.
+
 ## Next implementation sequence
 
 ### Spatial extension and source policy added

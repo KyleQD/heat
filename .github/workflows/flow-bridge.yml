@@ -19,3 +19,32 @@ jobs:
         with:
           node-version: '24'
       - run: node --test integrations/flow/*.test.mjs
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: heat
+          POSTGRES_PASSWORD: heat
+          POSTGRES_DB: heat
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U heat -d heat"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://heat:heat@127.0.0.1:5433/heat
+      FLOW_BRIDGE_TEST_DATABASE_URL: postgres://heat:heat@127.0.0.1:5433/heat
+      FLOW_BRIDGE_DISPOSABLE_DB: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run db:migrate
+      - run: node --import tsx --test integrations/flow/postgres.dbtest.mjs
