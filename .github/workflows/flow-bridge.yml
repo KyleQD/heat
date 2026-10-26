@@ -1,0 +1,21 @@
+name: Flow bridge pilot
+on:
+  pull_request:
+    paths:
+      - 'integrations/flow/**'
+      - '.github/workflows/flow-bridge.yml'
+  push:
+    paths:
+      - 'integrations/flow/**'
+      - '.github/workflows/flow-bridge.yml'
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test integrations/flow/publication.test.mjs
